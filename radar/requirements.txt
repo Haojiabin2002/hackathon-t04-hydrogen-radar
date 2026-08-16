@@ -1,0 +1,7 @@
+# 版本号取自本地已验证可跑的 .venv，不要随意升级
+beautifulsoup4==4.15.0
+fastapi==0.141.1
+lxml==6.1.1
+PyYAML==6.0.3
+requests==2.34.2
+uvicorn==0.52.3

@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>氢能商机雷达 · 氢璞创能</title>
+<style>
+  :root {
+    --bg: #f2f5f7; --surface: #ffffff; --surface-2: #e8eef1;
+    --ink: #17242f; --ink-2: #52667488; --ink-soft: #526674; --line: #d5dfe5;
+    --accent: #0f6e8c; --accent-soft: #e3eff4; --accent-ink: #0b556c;
+    --hi: #9a6a15; --hi-bg: #f5ead4; --ok: #2c7a4b; --ok-bg: #e2f0e8;
+    --warn: #a03c2e; --warn-bg: #f6e4e0; --p1: #8a63b8; --p1-bg: #efe9f7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d141c; --surface: #16212c; --surface-2: #1d2a37;
+      --ink: #dce6ed; --ink-2: #93a7b688; --ink-soft: #93a7b6; --line: #2b3c4a;
+      --accent: #4fb3d1; --accent-soft: #16303c; --accent-ink: #7ecbe2;
+      --hi: #d8a94f; --hi-bg: #322d1c; --ok: #6fbf8f; --ok-bg: #1c3227;
+      --warn: #e08573; --warn-bg: #3a2420; --p1: #b195d8; --p1-bg: #2a2138;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d141c; --surface: #16212c; --surface-2: #1d2a37;
+    --ink: #dce6ed; --ink-2: #93a7b688; --ink-soft: #93a7b6; --line: #2b3c4a;
+    --accent: #4fb3d1; --accent-soft: #16303c; --accent-ink: #7ecbe2;
+    --hi: #d8a94f; --hi-bg: #322d1c; --ok: #6fbf8f; --ok-bg: #1c3227;
+    --warn: #e08573; --warn-bg: #3a2420; --p1: #b195d8; --p1-bg: #2a2138;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "PingFang SC","Hiragino Sans GB","Noto Sans SC",system-ui,sans-serif;
+    line-height: 1.6; font-size: 15px;
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 14px 22px; background: var(--surface); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .logo { font-weight: 700; font-size: 17px; color: var(--accent-ink); }
+  .logo small { color: var(--ink-soft); font-weight: 400; font-size: 12.5px; margin-left: 8px; }
+  .ver {
+    margin-left: 10px; padding: 2px 7px; border-radius: 4px; vertical-align: 2px;
+    background: var(--accent-soft); color: var(--accent-ink);
+    font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .stats { display: flex; gap: 16px; margin-left: auto; flex-wrap: wrap; }
+  .stat { text-align: right; }
+  .stat .k { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .stat .lbl { font-size: 11.5px; color: var(--ink-soft); }
+  .tabs { display: flex; gap: 4px; padding: 12px 22px 0; flex-wrap: wrap; }
+  .tabs button {
+    border: 1px solid var(--line); border-bottom: none; background: var(--surface-2);
+    color: var(--ink-soft); padding: 8px 16px; border-radius: 7px 7px 0 0;
+    cursor: pointer; font-size: 14px; font-family: inherit;
+  }
+  .tabs button.on { background: var(--surface); color: var(--accent-ink); font-weight: 650; }
+  .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { padding: 0 22px 40px; }
+  .screen { display: none; background: var(--surface); border: 1px solid var(--line); border-radius: 0 8px 8px 8px; padding: 20px; }
+  .screen.on { display: block; }
+  .banner {
+    background: var(--hi-bg); color: var(--hi); border-radius: 6px;
+    padding: 10px 14px; font-size: 13.5px; margin-bottom: 16px;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+  th { text-align: left; background: var(--surface-2); padding: 9px 12px; font-weight: 650; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: var(--accent-soft); }
+  .num { font-variant-numeric: tabular-nums; }
+  .score-pill {
+    display: inline-block; min-width: 38px; text-align: center; padding: 1px 8px;
+    border-radius: 999px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px;
+  }
+  .s-hi { background: var(--ok-bg); color: var(--ok); }
+  .s-mid { background: var(--hi-bg); color: var(--hi); }
+  .s-lo { background: var(--surface-2); color: var(--ink-soft); }
+  .s-rej { background: var(--warn-bg); color: var(--warn); }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 4px; background: var(--accent-soft); color: var(--accent-ink); }
+  .tag.infer { background: #fdf0d8; color: #8a5d10; border: 1px solid #e8c98a; cursor: help; }
+  .tag.ok { background: #e3f3e8; color: #1f6b3d; cursor: help; }
+  .tag.stale { background: #f0ecec; color: #7a6a6a; margin-left: 6px; }
+  .corrob { font-size: 13px; line-height: 1.7; }
+  @media (prefers-color-scheme: dark) {
+    .tag.infer { background: #3a2f18; color: #e2b761; border-color: #6b5424; }
+    .tag.ok { background: #1d3527; color: #78c795; }
+    .tag.stale { background: #2f2b2b; color: #a89a9a; }
+  }
+  .muted { color: var(--ink-soft); font-size: 13px; }
+  .cols { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; }
+  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+  .panel { border: 1px solid var(--line); border-radius: 7px; padding: 16px; background: var(--surface); }
+  .panel h3 { margin: 0 0 10px; font-size: 15px; color: var(--accent-ink); }
+  .kv { display: grid; grid-template-columns: 88px 1fr; gap: 6px 12px; font-size: 13.5px; }
+  .kv dt { color: var(--ink-soft); }
+  .kv dd { margin: 0; }
+  .card-doc { white-space: pre-wrap; font-size: 13.5px; background: var(--surface-2); border-radius: 6px; padding: 14px; max-height: 460px; overflow: auto; }
+  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .board { grid-template-columns: repeat(2, 1fr); } }
+  .colm { background: var(--surface-2); border-radius: 7px; padding: 10px; min-height: 200px; }
+  .colm h4 { margin: 0 0 8px; font-size: 13px; color: var(--ink-soft); }
+  .lead { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; margin-bottom: 8px; font-size: 13px; cursor: pointer; }
+  .lead:hover { border-color: var(--accent); }
+  .lead .t { font-weight: 650; display: block; margin-bottom: 3px; }
+  a { color: var(--accent-ink); }
+  .empty { padding: 30px; text-align: center; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">氢能商机雷达<small>氢璞创能 · 国内模式</small><span class="ver" id="ver">v0.0.1</span></div>
+  <div class="stats" id="stats"></div>
+</div>
+
+<div class="tabs" role="tablist">
+  <button class="on" data-s="s1" role="tab">信号流</button>
+  <button data-s="s2" role="tab">线索详情</button>
+  <button data-s="s3" role="tab">商机看板</button>
+  <button data-s="s4" role="tab">海外模式</button>
+</div>
+
+<div class="wrap">
+  <section class="screen on" id="s1">
+    <div class="banner" id="b1">加载中…</div>
+    <div class="tablebox"><table>
+      <thead><tr><th>#</th><th>标题</th><th>来源</th><th>正文</th><th>抓取时间</th></tr></thead>
+      <tbody id="sig-rows"></tbody>
+    </table></div>
+  </section>
+
+  <section class="screen" id="s2">
+    <div class="banner" id="b2">从「商机看板」或下表点选一条线索查看详情</div>
+    <div class="cols">
+      <div class="panel">
+        <h3>线索列表</h3>
+        <div class="tablebox"><table>
+          <thead><tr><th>评分</th><th>公司</th><th>类型</th><th>推荐产品</th></tr></thead>
+          <tbody id="lead-rows"></tbody>
+        </table></div>
+      </div>
+      <div class="panel" id="detail"><h3>线索详情</h3><p class="muted">尚未选择线索。</p></div>
+    </div>
+  </section>
+
+  <section class="screen" id="s3">
+    <div class="banner" id="b3"></div>
+    <div class="board" id="board"></div>
+  </section>
+
+  <section class="screen" id="s4">
+    <div class="banner">海外模式（氢质氢离）：本期不在开发范围内，为静态占位。</div>
+    <div class="panel">
+      <h3>规划中的海外信号源</h3>
+      <p class="muted">同一条六段式管线，切换信号源即可复用：</p>
+      <ul class="muted">
+        <li>TED 欧盟招标公告（CPV 代码 + 关键词检索）</li>
+        <li>UNGM 联合国采购、世界银行项目库</li>
+        <li>IEA 氢能项目数据库（在建 / 已 FID 项目业主）</li>
+        <li>国际展会展商名录：Hannover Messe、FC EXPO、H2 MEET</li>
+        <li>海关提单数据反查真实进口商</li>
+      </ul>
+      <p class="muted">触达物由中文作战卡切换为英文开发信 + LinkedIn 序列。</p>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => (s ?? '').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let LEADS = [];
+
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.screen').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); $('#' + b.dataset.s).classList.add('on');
+});
+
+function scoreClass(s, status) {
+  if (status === 'rejected') return 's-rej';
+  if (s === null || s === undefined) return 's-lo';
+  return s >= 80 ? 's-hi' : s >= 60 ? 's-mid' : 's-lo';
+}
+
+async function load() {
+  const [st, sigs, leads] = await Promise.all([
+    fetch('/api/stats').then(r => r.json()),
+    fetch('/api/signals').then(r => r.json()),
+    fetch('/api/leads').then(r => r.json()),
+  ]);
+  LEADS = leads;
+
+  // 版本号以后端 VERSION 为准，HTML 里的 v0.0.1 只是接口没通时的兜底
+  if (st.version) $('#ver').textContent = 'v' + st.version;
+
+  $('#stats').innerHTML = [
+    ['signals', '真实信号'], ['leads', '有效线索'], ['matched', '已配型号'],
+    ['cards', '作战卡'], ['high', '高分商机'],
+  ].map(([k, l]) => `<div class="stat"><div class="k num">${st[k]}</div><div class="lbl">${l}</div></div>`).join('');
+
+  $('#b1').textContent = `共 ${sigs.length} 条公告，抓取自公开行业站点（抓取时间 ${(sigs[0]?.fetched_at || '').slice(0, 10)}）；`
+    + `时间列为公告原始发布时间，点标题可回源核对`;
+  $('#sig-rows').innerHTML = sigs.map(s => {
+    const pub = (s.published_at || '').slice(0, 10);
+    const stale = pub && pub < '2026-01-01';
+    return `<tr>
+      <td class="num">${s.id}</td>
+      <td><a href="${esc(s.source_url)}" target="_blank" rel="noopener">${esc(s.title)}</a>
+          ${stale ? '<span class="tag stale">历史存量</span>' : ''}
+          <div class="muted">${esc(s.excerpt).slice(0, 90)}…</div></td>
+      <td><span class="tag">${esc(s.source)}</span></td>
+      <td class="num">${s.text_len} 字</td>
+      <td class="muted num">${pub || '<span class="muted">未载</span>'}
+          <div class="muted" style="font-size:11px">抓取 ${esc(s.fetched_at).slice(0, 10)}</div></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">暂无信号</td></tr>';
+
+  renderLeads();
+  renderBoard();
+}
+
+// 字段值的溯源标注：原文逐字可查的照常显示，模型推断出来的必须标出来，
+// 否则评委点开来源核对时会发现看板上的地名在公告里根本不存在。
+function traced(value, trace, unsourced) {
+  if (!value) return '未提及';
+  const v = esc(value);
+  if (trace === 'inferred' || trace === 'partial') {
+    const miss = (unsourced || []).join('、');
+    return `${v} <span class="tag infer" title="${esc(miss)} 未见于公告原文，由模型据行业常识推断">`
+      + `系统推断${miss ? '：' + esc(miss) : ''}</span>`;
+  }
+  return `${v} <span class="tag ok" title="该值可在公告原文中逐字查到">原文可查</span>`;
+}
+
+function linkify(text) {
+  return esc(text).replace(/https?:\/\/\S+/g,
+    u => `<a href="${u}" target="_blank" rel="noopener">${u.slice(0, 46)}…</a>`);
+}
+
+function renderLeads() {
+  const valid = LEADS.filter(l => l.status !== 'rejected');
+  $('#b2').textContent = valid.length
+    ? `${valid.length} 条有效线索，按评分降序；点击任意行查看画像、评分理由与作战卡`
+    : '尚无线索——LLM 通道恢复后运行 pipeline 即可生成（见 BLOCKED.md）';
+  $('#lead-rows').innerHTML = LEADS.map(l => `<tr class="clickable" onclick="showDetail(${l.id})">
+      <td><span class="score-pill ${scoreClass(l.score, l.status)}">${l.status === 'rejected' ? '非商机' : (l.score ?? '—')}</span></td>
+      <td>${esc(l.company) || '<span class="muted">未提及</span>'}</td>
+      <td class="muted">${esc(l.signal_type)}</td>
+      <td>${esc(l.matched_product) || '<span class="muted">—</span>'}</td>
+    </tr>`).join('') || '<tr><td colspan="4" class="empty">暂无线索</td></tr>';
+}
+
+async function showDetail(id) {
+  const l = LEADS.find(x => x.id === id);
+  if (!l) return;
+  let card = '';
+  if (l.has_card) {
+    const r = await fetch(`/api/leads/${id}/card`);
+    if (r.ok) card = await r.text();
+  }
+  $('#detail').innerHTML = `<h3>线索详情 #${l.id}</h3>
+    <dl class="kv">
+      <dt>公司</dt><dd>${traced(l.company, l.company_trace, l.company_unsourced)}</dd>
+      <dt>信号类型</dt><dd>${esc(l.signal_type)}</dd>
+      <dt>功率/规模</dt><dd>${esc(l.power_range) || '未提及'}</dd>
+      <dt>区域</dt><dd>${traced(l.region, l.region_trace, l.region_unsourced)}</dd>
+      <dt>金额/数量</dt><dd>${esc(l.amount) || '未提及'}</dd>
+      <dt>评分</dt><dd><span class="score-pill ${scoreClass(l.score, l.status)}">${l.score ?? '—'}</span></dd>
+      <dt>评分理由</dt><dd>${esc(l.score_reason) || '—'}</dd>
+      <dt>推荐产品</dt><dd><b>${esc(l.matched_product) || '—'}</b></dd>
+      <dt>推荐理由</dt><dd>${esc(l.match_reason) || '—'}</dd>
+      <dt>公告发布</dt><dd>${esc((l.published_at || '').slice(0, 16)) || '<span class="muted">原文未载</span>'}</dd>
+      <dt>来源</dt><dd><a href="${esc(l.source_url)}" target="_blank" rel="noopener">${esc(l.signal_title)}</a></dd>
+      ${l.corroboration ? `<dt>交叉验证</dt><dd class="corrob">${linkify(l.corroboration)}</dd>` : ''}
+    </dl>
+    ${card ? `<h3 style="margin-top:16px">商机作战卡</h3><div class="card-doc">${esc(card)}</div>`
+           : '<p class="muted" style="margin-top:14px">该线索暂无作战卡（仅 80 分以上生成）。</p>'}`;
+  document.querySelector('.tabs button[data-s="s2"]').click();
+}
+
+function renderBoard() {
+  const cols = [
+    ['高分商机 ≥80', l => l.status !== 'rejected' && l.score >= 80],
+    ['中分 60-79', l => l.status !== 'rejected' && l.score >= 60 && l.score < 80],
+    ['低分 <60', l => l.status !== 'rejected' && (l.score ?? 0) < 60],
+    ['已判非商机', l => l.status === 'rejected'],
+  ];
+  $('#b3').textContent = '按评分分档的商机看板，点击卡片查看详情';
+  $('#board').innerHTML = cols.map(([name, fn]) => {
+    const items = LEADS.filter(fn);
+    return `<div class="colm"><h4>${name}（${items.length}）</h4>
+      ${items.map(l => `<div class="lead" onclick="showDetail(${l.id})">
+        <span class="t">${esc(l.company) || '未提及主体'}</span>
+        <span class="muted">${esc(l.signal_type)} ${esc(l.power_range)}</span>
+        ${l.matched_product ? `<div class="tag" style="margin-top:4px">${esc(l.matched_product)}</div>` : ''}
+      </div>`).join('') || '<p class="muted" style="font-size:12.5px">空</p>'}</div>`;
+  }).join('');
+}
+
+load().catch(e => { $('#b1').textContent = '加载失败：' + e; });
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# 虚拟环境（372MB，靠 radar/requirements.txt 重建，不进 git）
+.venv/
+venv/
+env/
+
+# 运行产物：SQLite 是二进制文件，git 无法合并，两人各跑一遍必冲突
+radar/radar.db
+radar/radar.db.bak*
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# 本地私有配置（各自的偏好，不共享）
+.env
+.env.local
+CLAUDE.local.md
+.claude/settings.local.json
