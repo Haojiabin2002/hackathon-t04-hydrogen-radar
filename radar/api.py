@@ -60,6 +60,24 @@ def require_settings_access(request: Request):
             detail="模型设置默认只允许本机访问；公网部署请设置 RADAR_SETTINGS_TOKEN",
         )
 
+    # 本机端口仍可能被恶意网页跨站触发。浏览器若提供来源信息，只接受同源请求；
+    # curl 等非浏览器客户端没有这些头，继续保留本机调试能力。
+    fetch_site = request.headers.get("sec-fetch-site", "").lower()
+    if fetch_site and fetch_site not in {"same-origin", "none"}:
+        raise HTTPException(status_code=403, detail="拒绝跨站访问模型设置")
+
+    target_scheme = request.url.scheme.lower()
+    target_port = urlsplit("//" + request.headers.get("host", "")).port
+    target_port = target_port or (443 if target_scheme == "https" else 80)
+    for source in (request.headers.get("origin", ""), request.headers.get("referer", "")):
+        if not source:
+            continue
+        parsed = urlsplit(source)
+        source_port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+        if (parsed.scheme.lower(), (parsed.hostname or "").lower(), source_port) != (
+                target_scheme, host, target_port):
+            raise HTTPException(status_code=403, detail="拒绝跨站访问模型设置")
+
 
 def no_store(response: Response):
     response.headers["Cache-Control"] = "no-store"
@@ -233,7 +251,7 @@ def get_llm_config(request: Request, response: Response):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
-@app.get("/api/llm/health")
+@app.post("/api/llm/health")
 def get_llm_health(request: Request, response: Response):
     require_settings_access(request)
     no_store(response)
