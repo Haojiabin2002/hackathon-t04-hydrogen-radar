@@ -21,8 +21,8 @@ if $PY llm.py | grep -q "LLM_MODE: live"; then
     echo "      通道可用"
 else
     LLM_OK=0
-    echo "      通道不可用——按任务书规矩，任务2/3/4 停做，不使用任何替代品"
-    echo "      解除办法：在终端执行一次  claude /login"
+    echo "      通道不可用——按任务书规矩，抽取/匹配/作战卡 全部停做，不使用任何替代品"
+    echo "      服务启动后可在「模型通道」页选择已登录的 Codex / Claude，或配置 API Key"
 fi
 
 if [ "$LLM_OK" = "1" ]; then
@@ -32,10 +32,11 @@ if [ "$LLM_OK" = "1" ]; then
     $PY pipeline.py match
     echo "[6/6] 生成作战卡"
     $PY pipeline.py cards
-    # 把 PROGRESS.md 的 LLM_MODE 同步为 live
-    sed -i '' 's/^LLM_MODE: .*/LLM_MODE: live/' PROGRESS.md
+    # 用 Python 改首行，兼容 macOS 与 Linux，且只在真实通道调用成功后标 live
+    $PY -c 'from pathlib import Path; p=Path("PROGRESS.md"); s=p.read_text(); p.write_text(__import__("re").sub(r"^LLM_MODE: .*", "LLM_MODE: live", s, count=1), encoding="utf-8")'
 else
     echo "[4-6/6] 已跳过（LLM 阻塞）"
+    $PY -c 'from pathlib import Path; p=Path("PROGRESS.md"); s=p.read_text(); p.write_text(__import__("re").sub(r"^LLM_MODE: .*", "LLM_MODE: blocked", s, count=1), encoding="utf-8")'
 fi
 
 echo "启动服务 http://127.0.0.1:${PORT}"

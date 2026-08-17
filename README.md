@@ -1,6 +1,6 @@
 # 氢能商机雷达
 
-**v0.0.1** · 氢璞创能 · 黑客松赛题 T04「氢能产业商机与精准获客 Agent」
+**v0.1.0** · 氢璞创能 · 黑客松赛题 T04「氢能产业商机与精准获客 Agent」
 
 从氢能行业公开网站抓取真实招标 / 中标 / 项目公告，用大模型抽取商机字段并做四维打分，
 匹配氢璞创能的产品型号，为高分商机生成销售作战卡，最后在网页看板上呈现——
@@ -25,9 +25,27 @@ bash radar/run.sh
 
 跑完打开 http://127.0.0.1:8000 就是看板。
 
-> **前置条件**：本机装有 `python3.11`、`uv`、`sqlite3`，以及已登录的 `claude` CLI。
-> 如果 CLI 未登录，`run.sh` 会跳过任务 2/3/4 并明确提示——
-> 按项目规矩此时**不使用任何替代数据**，在终端执行一次 `claude /login` 即可解除。
+> **前置条件**：本机装有 `python3.11`、`uv`、`sqlite3`，并至少配置一个真实模型通道。
+> 如果通道不可用，`run.sh` 会跳过模型任务并明确提示；按项目规矩此时
+> **不使用任何替代数据**。
+
+## 模型通道
+
+看板的「模型通道」页会自动检测并允许选择：
+
+- **Codex（GPT）CLI**：复用本机 ChatGPT/Codex 登录与订阅额度；
+- **Claude CLI**：复用本机 Claude 登录；
+- **OpenAI SDK**：使用 `OPENAI_API_KEY` 或页面保存的 Key，API 用量单独计费；
+- **OpenAI-compatible API**：填写 HTTPS Base URL、模型和 Key。
+
+默认仍是原来的 Claude CLI，未主动保存设置时不会改变历史行为。选定通道失败会直接停止，
+不会静默换到其他模型。页面输入的 Key 不回显，保存在仓库外的
+`~/.config/hydrogen-radar/llm.json`（权限 `0600`）；部署环境优先使用环境变量。
+
+公网部署模型设置页时必须配置 `RADAR_SETTINGS_TOKEN`，并在请求中使用
+`Authorization: Bearer <token>` 或 `X-Radar-Settings-Token`。未配置口令时设置接口仅允许
+从 `localhost` 访问。兼容 API 默认只允许公网 HTTPS；确需连接本地模型服务时显式设置
+`RADAR_ALLOW_PRIVATE_LLM_URL=1`。
 
 ## 验收
 

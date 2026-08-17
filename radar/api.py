@@ -1,14 +1,21 @@
 """FastAPI 服务：对外提供线索/信号/作战卡接口，并托管看板前端。"""
+import os
 import re
+import secrets
+import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, PlainTextResponse
+from pydantic import BaseModel, Field
 
 from db import connect
+from llm import (LLMUnavailable, health_check, provider_statuses, public_config,
+                 save_config, test_provider)
 
 # 全项目唯一版本号来源：改这里，OpenAPI、/api/stats、看板角标一起变
-VERSION = "0.0.1"
+VERSION = "0.1.0"
 
 app = FastAPI(title="氢能商机雷达 API", version=VERSION)
 WEB = Path(__file__).parent / "web"
@@ -16,6 +23,88 @@ WEB = Path(__file__).parent / "web"
 
 def rows_to_dicts(rows):
     return [dict(r) for r in rows]
+
+
+class LLMConfigInput(BaseModel):
+    provider: str
+    model: str | None = Field(default="", max_length=128)
+    base_url: str | None = Field(default="", max_length=2048)
+    api_key: str | None = Field(default=None, max_length=4096)
+    clear_api_key: bool = False
+
+
+class LLMTestInput(BaseModel):
+    provider: str
+    model: str | None = Field(default="", max_length=128)
+    base_url: str | None = Field(default="", max_length=2048)
+    api_key: str | None = Field(default=None, max_length=4096)
+
+
+def require_settings_access(request: Request):
+    """模型凭据属于管理员设置：默认仅本机；部署时必须配管理口令。"""
+    expected = os.getenv("RADAR_SETTINGS_TOKEN", "")
+    authorization = request.headers.get("authorization", "")
+    bearer = authorization[7:] if authorization.lower().startswith("bearer ") else ""
+    supplied = request.headers.get("x-radar-settings-token", "") or bearer
+    if expected:
+        if not supplied or not secrets.compare_digest(supplied, expected):
+            raise HTTPException(status_code=401, detail="模型设置口令无效")
+        return
+
+    client_host = request.client.host if request.client else ""
+    host = (urlsplit("//" + request.headers.get("host", "")).hostname or "").lower()
+    loopbacks = {"127.0.0.1", "::1", "localhost"}
+    if client_host not in loopbacks or host not in loopbacks:
+        raise HTTPException(
+            status_code=403,
+            detail="模型设置默认只允许本机访问；公网部署请设置 RADAR_SETTINGS_TOKEN",
+        )
+
+
+def no_store(response: Response):
+    response.headers["Cache-Control"] = "no-store"
+
+
+def llm_settings_payload():
+    """把通道内部状态转换成稳定的前端契约。"""
+    config = public_config()
+    selected = config["provider"]
+    billing = {
+        "codex_cli": "Codex CLI 登录 ChatGPT 后使用 Codex 订阅额度，不走 OpenAI API Key。",
+        "claude_cli": "使用 Claude CLI 当前登录账号的额度。",
+        "openai_api": "OpenAI SDK 使用 API Key，按 API 平台单独计费；ChatGPT 订阅不包含 API 用量。",
+        "openai_compatible": "费用与数据处理规则由所填写的兼容 API 服务商决定。",
+    }
+    providers = []
+    for item in provider_statuses():
+        provider = item["id"]
+        is_api = provider in ("openai_api", "openai_compatible")
+        if item["available"]:
+            status, status_label = "ready", "可用"
+        elif not item["installed"]:
+            status, status_label = "not_installed", "未安装"
+        elif not is_api and not item["authenticated"]:
+            status, status_label = "needs_login", "未登录"
+        elif is_api and not config["has_api_key"].get(provider):
+            status, status_label = "needs_key", "需要密钥"
+        else:
+            status, status_label = "manual", "待补配置"
+        providers.append({
+            "id": provider,
+            "name": item["label"],
+            "status": status,
+            "status_label": status_label,
+            "detail": " · ".join(x for x in (item.get("version"), item.get("detail")) if x),
+            "billing": billing[provider],
+            "selectable": is_api or item["available"],
+            "is_default": provider == selected,
+            "requires_api_key": is_api,
+            "supports_base_url": provider == "openai_compatible",
+            "key_configured": config["has_api_key"].get(provider, False),
+            "model": config["models"].get(provider, ""),
+            "base_url": config["base_url"] if provider == "openai_compatible" else "",
+        })
+    return {"selected": selected, "providers": providers}
 
 
 # 省级行政区名——模型最容易由项目名"补"出来的一类地名
@@ -115,6 +204,94 @@ def stats():
     }
     conn.close()
     return data
+
+
+@app.get("/api/llm/providers")
+def llm_providers(request: Request, response: Response):
+    """扫描本机真实通道并返回脱敏配置，不执行模型推理。"""
+    require_settings_access(request)
+    no_store(response)
+    try:
+        return llm_settings_payload()
+    except LLMUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/llm/providers/scan")
+def scan_llm_providers(request: Request, response: Response):
+    """显式重新检测安装和登录状态。"""
+    return llm_providers(request, response)
+
+
+@app.get("/api/llm/config")
+def get_llm_config(request: Request, response: Response):
+    require_settings_access(request)
+    no_store(response)
+    try:
+        return public_config()
+    except LLMUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/llm/health")
+def get_llm_health(request: Request, response: Response):
+    require_settings_access(request)
+    no_store(response)
+    try:
+        ok, detail = health_check()
+        config = public_config()
+    except LLMUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not ok:
+        raise HTTPException(status_code=503, detail=detail)
+    return {"ok": True, "provider": config["provider"], "detail": detail}
+
+
+@app.put("/api/llm/config")
+def update_llm_config(payload: LLMConfigInput, request: Request, response: Response):
+    """保存当前通道；API Key 仅写入仓库外 0600 文件且绝不回传。"""
+    require_settings_access(request)
+    no_store(response)
+    try:
+        config = save_config(
+            provider=payload.provider,
+            model=payload.model or "",
+            base_url=payload.base_url or "",
+            api_key=payload.api_key,
+            clear_api_key=payload.clear_api_key,
+        )
+        result = llm_settings_payload()
+        result.update({"ok": True, "message": "默认模型通道已保存", "config": config})
+        return result
+    except (ValueError, LLMUnavailable) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/llm/providers/test")
+def test_llm_connection(payload: LLMTestInput, request: Request, response: Response):
+    """用表单中的临时配置发起一次真实请求；测试不保存密钥。"""
+    require_settings_access(request)
+    no_store(response)
+    started = time.monotonic()
+    try:
+        ok, detail = test_provider(
+            provider=payload.provider,
+            model=payload.model or "",
+            base_url=payload.base_url or "",
+            api_key=payload.api_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not ok:
+        raise HTTPException(status_code=502, detail=detail)
+    return {"ok": True, "message": "连接成功", "detail": detail,
+            "latency_ms": round((time.monotonic() - started) * 1000)}
+
+
+@app.post("/api/llm/test", include_in_schema=False)
+def test_llm_connection_compat(payload: LLMTestInput, request: Request, response: Response):
+    """早期调用方的兼容别名。"""
+    return test_llm_connection(payload, request, response)
 
 
 @app.get("/")

@@ -109,6 +109,87 @@
   .lead .t { font-weight: 650; display: block; margin-bottom: 3px; }
   a { color: var(--accent-ink); }
   .empty { padding: 30px; text-align: center; color: var(--ink-soft); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  .channel-shell { max-width: 920px; }
+  .channel-intro {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 18px;
+    padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 16px;
+  }
+  .channel-intro h2 { margin: 0 0 3px; font-size: 17px; }
+  .channel-intro p { margin: 0; }
+  .channel-list { display: grid; gap: 9px; margin: 12px 0 18px; }
+  .channel-option {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px;
+    align-items: start; padding: 13px 14px; border: 1px solid var(--line);
+    border-radius: 7px; background: var(--surface); cursor: pointer;
+  }
+  .channel-option:hover { border-color: var(--accent); }
+  .channel-option:has(input:checked) {
+    border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent);
+    background: var(--accent-soft);
+  }
+  .channel-option:has(input:disabled) { cursor: not-allowed; opacity: .72; }
+  .channel-option:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .channel-option input { margin-top: 4px; accent-color: var(--accent); }
+  .channel-name { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; font-weight: 650; }
+  .channel-detail { margin-top: 2px; color: var(--ink-soft); font-size: 13px; }
+  .channel-billing { margin-top: 4px; font-size: 12.5px; color: var(--ink-soft); }
+  .status-badge {
+    display: inline-block; white-space: nowrap; border-radius: 999px;
+    padding: 2px 8px; font-size: 11.5px; font-weight: 650;
+  }
+  .status-ready { color: var(--ok); background: var(--ok-bg); }
+  .status-attention { color: var(--hi); background: var(--hi-bg); }
+  .status-error { color: var(--warn); background: var(--warn-bg); }
+  .status-neutral { color: var(--ink-soft); background: var(--surface-2); }
+  .channel-fields {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px;
+    padding: 15px; border: 1px solid var(--line); border-radius: 7px;
+    background: var(--surface-2); margin-bottom: 14px;
+  }
+  .field { display: grid; gap: 5px; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 13px; font-weight: 650; }
+  .field input {
+    width: 100%; min-height: 38px; border: 1px solid var(--line); border-radius: 5px;
+    background: var(--surface); color: var(--ink); padding: 7px 10px;
+    font: inherit; font-size: 14px;
+  }
+  .field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .field-help { margin: 0; color: var(--ink-soft); font-size: 12px; }
+  .billing-note {
+    padding: 10px 12px; border-left: 3px solid var(--accent);
+    background: var(--accent-soft); color: var(--accent-ink); font-size: 13px;
+    margin: 0 0 14px;
+  }
+  .channel-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .action {
+    border: 1px solid var(--line); border-radius: 5px; padding: 7px 13px;
+    background: var(--surface); color: var(--ink); cursor: pointer;
+    font: inherit; font-size: 13.5px;
+  }
+  .action.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 650; }
+  .action:hover:not(:disabled) { border-color: var(--accent); }
+  .action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .action:disabled { cursor: not-allowed; opacity: .6; }
+  .action[aria-busy="true"] { cursor: wait; }
+  .channel-message { flex-basis: 100%; min-height: 1.6em; font-size: 13px; }
+  .channel-message.ok { color: var(--ok); }
+  .channel-message.error { color: var(--warn); }
+  .admin-access { margin: 0 0 14px; font-size: 13px; color: var(--ink-soft); }
+  .admin-access summary { cursor: pointer; color: var(--accent-ink); }
+  .admin-access .field { margin-top: 9px; max-width: 440px; }
+  @media (max-width: 640px) {
+    .channel-intro { display: block; }
+    .channel-intro .action { margin-top: 10px; }
+    .channel-option { grid-template-columns: auto minmax(0, 1fr); }
+    .channel-option > .status-badge { grid-column: 2; justify-self: start; }
+    .channel-fields { grid-template-columns: 1fr; }
+    .field.full { grid-column: auto; }
+  }
 </style>
 </head>
 <body>
@@ -118,15 +199,16 @@
   <div class="stats" id="stats"></div>
 </div>
 
-<div class="tabs" role="tablist">
-  <button class="on" data-s="s1" role="tab">信号流</button>
-  <button data-s="s2" role="tab">线索详情</button>
-  <button data-s="s3" role="tab">商机看板</button>
-  <button data-s="s4" role="tab">海外模式</button>
+<div class="tabs" role="tablist" aria-label="雷达功能">
+  <button class="on" id="tab-s1" data-s="s1" role="tab" aria-controls="s1" aria-selected="true" tabindex="0">信号流</button>
+  <button id="tab-s2" data-s="s2" role="tab" aria-controls="s2" aria-selected="false" tabindex="-1">线索详情</button>
+  <button id="tab-s3" data-s="s3" role="tab" aria-controls="s3" aria-selected="false" tabindex="-1">商机看板</button>
+  <button id="tab-s4" data-s="s4" role="tab" aria-controls="s4" aria-selected="false" tabindex="-1">海外模式</button>
+  <button id="tab-s5" data-s="s5" role="tab" aria-controls="s5" aria-selected="false" tabindex="-1">模型通道</button>
 </div>
 
 <div class="wrap">
-  <section class="screen on" id="s1">
+  <section class="screen on" id="s1" role="tabpanel" aria-labelledby="tab-s1">
     <div class="banner" id="b1">加载中…</div>
     <div class="tablebox"><table>
       <thead><tr><th>#</th><th>标题</th><th>来源</th><th>正文</th><th>抓取时间</th></tr></thead>
@@ -134,7 +216,7 @@
     </table></div>
   </section>
 
-  <section class="screen" id="s2">
+  <section class="screen" id="s2" role="tabpanel" aria-labelledby="tab-s2" hidden>
     <div class="banner" id="b2">从「商机看板」或下表点选一条线索查看详情</div>
     <div class="cols">
       <div class="panel">
@@ -148,12 +230,12 @@
     </div>
   </section>
 
-  <section class="screen" id="s3">
+  <section class="screen" id="s3" role="tabpanel" aria-labelledby="tab-s3" hidden>
     <div class="banner" id="b3"></div>
     <div class="board" id="board"></div>
   </section>
 
-  <section class="screen" id="s4">
+  <section class="screen" id="s4" role="tabpanel" aria-labelledby="tab-s4" hidden>
     <div class="banner">海外模式（氢质氢离）：本期不在开发范围内，为静态占位。</div>
     <div class="panel">
       <h3>规划中的海外信号源</h3>
@@ -168,6 +250,66 @@
       <p class="muted">触达物由中文作战卡切换为英文开发信 + LinkedIn 序列。</p>
     </div>
   </section>
+
+  <section class="screen" id="s5" role="tabpanel" aria-labelledby="tab-s5" hidden>
+    <div class="channel-shell">
+      <div class="channel-intro">
+        <div>
+          <h2>模型通道</h2>
+          <p class="muted">扫描本机可用的 CLI 或配置 API，选定商机研判所用的默认通道。</p>
+        </div>
+        <button class="action" id="scan-channels" type="button">重新扫描</button>
+      </div>
+
+      <form id="channel-form" novalidate>
+        <details class="admin-access">
+          <summary>公网部署：填写模型设置口令</summary>
+          <div class="field">
+            <label for="settings-token">设置口令</label>
+            <input id="settings-token" type="password" autocomplete="current-password"
+                   aria-describedby="settings-token-help">
+            <p class="field-help" id="settings-token-help">对应服务端 RADAR_SETTINGS_TOKEN，仅保留在当前浏览器会话；本机访问无需填写。</p>
+          </div>
+        </details>
+        <fieldset style="border:0;padding:0;margin:0">
+          <legend class="sr-only">选择默认模型通道</legend>
+          <div id="channel-list" class="channel-list" role="radiogroup" aria-describedby="billing-note">
+            <div class="empty" role="status">正在检测模型通道…</div>
+          </div>
+        </fieldset>
+
+        <div id="channel-fields" class="channel-fields" hidden>
+          <div class="field full" id="api-key-field">
+            <label for="channel-api-key">API Key</label>
+            <input id="channel-api-key" name="api_key" type="password"
+                   autocomplete="new-password" autocapitalize="none" spellcheck="false"
+                   aria-describedby="api-key-help" data-1p-ignore>
+            <p class="field-help" id="api-key-help">密钥不会回显；留空时继续使用已保存的密钥。测试不会保存新密钥。</p>
+          </div>
+          <div class="field" id="base-url-field" hidden>
+            <label for="channel-base-url">API Base URL</label>
+            <input id="channel-base-url" name="base_url" type="url"
+                   placeholder="https://api.example.com/v1" autocomplete="url" spellcheck="false">
+          </div>
+          <div class="field" id="model-field">
+            <label for="channel-model">模型</label>
+            <input id="channel-model" name="model" type="text"
+                   placeholder="由服务端默认配置" autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+
+        <p class="billing-note" id="billing-note">
+          Codex CLI 登录 ChatGPT 后使用你的 Codex 订阅额度；OpenAI SDK / 兼容 API 使用 API Key，按 API 平台单独计费，ChatGPT 订阅不包含 API 用量。
+        </p>
+
+        <div class="channel-actions">
+          <button class="action" id="test-channel" type="button" disabled>测试连接</button>
+          <button class="action primary" id="save-channel" type="submit" disabled>保存为默认通道</button>
+          <div class="channel-message" id="channel-message" role="status" aria-live="polite"></div>
+        </div>
+      </form>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -175,10 +317,221 @@ const $ = s => document.querySelector(s);
 const esc = s => (s ?? '').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let LEADS = [];
 
-document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
-  document.querySelectorAll('.screen').forEach(x => x.classList.remove('on'));
-  b.classList.add('on'); $('#' + b.dataset.s).classList.add('on');
+const TABS = [...document.querySelectorAll('.tabs button')];
+function activateTab(button, focus = false) {
+  TABS.forEach(x => {
+    const selected = x === button;
+    x.classList.toggle('on', selected);
+    x.setAttribute('aria-selected', String(selected));
+    x.tabIndex = selected ? 0 : -1;
+    const panel = $('#' + x.dataset.s);
+    panel.classList.toggle('on', selected);
+    panel.hidden = !selected;
+  });
+  if (focus) button.focus();
+  if (button.dataset.s === 's5' && !CHANNEL_STATE.loaded) loadChannels();
+}
+TABS.forEach((button, index) => {
+  button.addEventListener('click', () => activateTab(button));
+  button.addEventListener('keydown', event => {
+    let next = null;
+    if (event.key === 'ArrowRight') next = (index + 1) % TABS.length;
+    if (event.key === 'ArrowLeft') next = (index - 1 + TABS.length) % TABS.length;
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = TABS.length - 1;
+    if (next !== null) { event.preventDefault(); activateTab(TABS[next], true); }
+  });
+});
+
+const CHANNEL_STATE = { providers: [], selected: '', loaded: false };
+$('#settings-token').value = sessionStorage.getItem('radar-settings-token') || '';
+$('#settings-token').addEventListener('change', event => {
+  const value = event.currentTarget.value.trim();
+  if (value) sessionStorage.setItem('radar-settings-token', value);
+  else sessionStorage.removeItem('radar-settings-token');
+  CHANNEL_STATE.loaded = false;
+});
+const STATUS_COPY = {
+  ready: ['可用', 'status-ready'],
+  needs_key: ['需要密钥', 'status-attention'],
+  needs_login: ['未登录', 'status-attention'],
+  not_installed: ['未安装', 'status-neutral'],
+  unavailable: ['不可用', 'status-error'],
+  manual: ['手动配置', 'status-neutral'],
+};
+
+async function apiJson(url, options = {}) {
+  const settingsToken = $('#settings-token')?.value.trim();
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(settingsToken ? { 'X-Radar-Settings-Token': settingsToken } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  let body = null;
+  try { body = await response.json(); } catch (_) { /* 非 JSON 错误由状态码处理 */ }
+  if (!response.ok) throw new Error(body?.detail || body?.message || `请求失败（HTTP ${response.status}）`);
+  return body;
+}
+
+function setChannelMessage(text = '', kind = '') {
+  const box = $('#channel-message');
+  box.textContent = text;
+  box.className = `channel-message ${kind}`.trim();
+  box.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+}
+
+function setButtonBusy(button, busy, busyText) {
+  if (!button.dataset.label) button.dataset.label = button.textContent;
+  button.disabled = busy;
+  button.setAttribute('aria-busy', String(busy));
+  button.textContent = busy ? busyText : button.dataset.label;
+}
+
+function renderChannels(payload) {
+  CHANNEL_STATE.providers = Array.isArray(payload?.providers) ? payload.providers : [];
+  CHANNEL_STATE.selected = payload?.selected || CHANNEL_STATE.selected;
+  const list = $('#channel-list');
+  list.replaceChildren();
+  if (!CHANNEL_STATE.providers.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty'; empty.setAttribute('role', 'status');
+    empty.textContent = '未检测到模型通道。可重新扫描，或配置 OpenAI 兼容 API。';
+    list.append(empty); syncChannelFields(); return;
+  }
+
+  CHANNEL_STATE.providers.forEach((provider, index) => {
+    const option = document.createElement('label'); option.className = 'channel-option';
+    const radio = document.createElement('input');
+    radio.type = 'radio'; radio.name = 'provider'; radio.value = provider.id;
+    radio.disabled = provider.selectable === false;
+    radio.checked = provider.id === CHANNEL_STATE.selected;
+    radio.setAttribute('aria-describedby', `provider-detail-${index}`);
+
+    const body = document.createElement('div');
+    const title = document.createElement('div'); title.className = 'channel-name';
+    const name = document.createElement('span'); name.textContent = provider.name;
+    title.append(name);
+    if (provider.is_default) {
+      const current = document.createElement('span'); current.className = 'tag'; current.textContent = '当前默认';
+      title.append(current);
+    }
+    const detail = document.createElement('div');
+    detail.id = `provider-detail-${index}`; detail.className = 'channel-detail';
+    detail.textContent = provider.detail || '等待检测结果';
+    const billing = document.createElement('div'); billing.className = 'channel-billing';
+    billing.textContent = provider.billing || '';
+    body.append(title, detail, billing);
+
+    const badge = document.createElement('span');
+    const status = STATUS_COPY[provider.status] || STATUS_COPY.unavailable;
+    badge.className = `status-badge ${status[1]}`; badge.textContent = provider.status_label || status[0];
+    option.append(radio, body, badge); list.append(option);
+    radio.addEventListener('change', () => {
+      CHANNEL_STATE.selected = provider.id;
+      setChannelMessage(); syncChannelFields();
+    });
+  });
+  if (!list.querySelector('input:checked')) {
+    const first = list.querySelector('input:not(:disabled)');
+    if (first) { first.checked = true; CHANNEL_STATE.selected = first.value; }
+  }
+  syncChannelFields();
+}
+
+function selectedProvider() {
+  return CHANNEL_STATE.providers.find(p => p.id === CHANNEL_STATE.selected);
+}
+
+function syncChannelFields() {
+  const provider = selectedProvider();
+  const needsKey = Boolean(provider?.requires_api_key);
+  $('#channel-fields').hidden = !needsKey;
+  $('#base-url-field').hidden = !provider?.supports_base_url;
+  $('#channel-api-key').required = needsKey && !provider?.key_configured;
+  $('#channel-api-key').placeholder = provider?.key_configured
+    ? '已安全保存；留空则继续使用' : '输入 API Key';
+  $('#channel-base-url').required = Boolean(provider?.supports_base_url);
+  $('#channel-base-url').value = provider?.base_url || '';
+  $('#channel-model').value = provider?.model || '';
+  const enabled = Boolean(provider) && provider.selectable !== false;
+  $('#test-channel').disabled = !enabled;
+  $('#save-channel').disabled = !enabled;
+  if (provider?.billing) $('#billing-note').textContent = provider.billing;
+}
+
+function channelPayload() {
+  const provider = selectedProvider();
+  const payload = {
+    provider: provider?.id,
+    model: $('#channel-model').value.trim() || null,
+    base_url: $('#channel-base-url').value.trim() || null,
+  };
+  const secret = $('#channel-api-key').value.trim();
+  if (secret) payload.api_key = secret;
+  return payload;
+}
+
+function validateChannel() {
+  const provider = selectedProvider();
+  if (!provider) { setChannelMessage('请先选择一个模型通道。', 'error'); return false; }
+  const form = $('#channel-form');
+  if (!form.checkValidity()) { form.reportValidity(); return false; }
+  return true;
+}
+
+async function loadChannels(force = false) {
+  if (CHANNEL_STATE.loaded && !force) return;
+  const list = $('#channel-list');
+  list.innerHTML = '<div class="empty" role="status">正在检测模型通道…</div>';
+  setChannelMessage();
+  try {
+    const payload = await apiJson('/api/llm/providers');
+    CHANNEL_STATE.loaded = true; renderChannels(payload);
+  } catch (error) {
+    CHANNEL_STATE.loaded = false;
+    list.innerHTML = '<div class="empty" role="alert">读取通道状态失败。请确认后端已启动后重试。</div>';
+    setChannelMessage(error.message, 'error');
+  }
+}
+
+$('#scan-channels').addEventListener('click', async event => {
+  const button = event.currentTarget; setButtonBusy(button, true, '扫描中…'); setChannelMessage();
+  try {
+    const payload = await apiJson('/api/llm/providers/scan', { method: 'POST', body: '{}' });
+    CHANNEL_STATE.loaded = true; renderChannels(payload); setChannelMessage('扫描完成。', 'ok');
+  } catch (error) { setChannelMessage(`扫描失败：${error.message}`, 'error'); }
+  finally { setButtonBusy(button, false); }
+});
+
+$('#test-channel').addEventListener('click', async event => {
+  if (!validateChannel()) return;
+  const button = event.currentTarget; setButtonBusy(button, true, '测试中…'); setChannelMessage();
+  try {
+    const result = await apiJson('/api/llm/providers/test', {
+      method: 'POST', body: JSON.stringify(channelPayload()),
+    });
+    const latency = Number.isFinite(result?.latency_ms) ? ` · ${result.latency_ms} ms` : '';
+    setChannelMessage(`${result?.message || '连接成功'}${latency}`, 'ok');
+  } catch (error) { setChannelMessage(`测试失败：${error.message}`, 'error'); }
+  finally { setButtonBusy(button, false); syncChannelFields(); }
+});
+
+$('#channel-form').addEventListener('submit', async event => {
+  event.preventDefault(); if (!validateChannel()) return;
+  const button = $('#save-channel'); setButtonBusy(button, true, '保存中…'); setChannelMessage();
+  try {
+    const result = await apiJson('/api/llm/config', {
+      method: 'PUT', body: JSON.stringify(channelPayload()),
+    });
+    $('#channel-api-key').value = '';
+    if (result?.providers) renderChannels(result);
+    else { CHANNEL_STATE.loaded = false; await loadChannels(true); }
+    setChannelMessage(result?.message || '默认模型通道已保存。', 'ok');
+  } catch (error) { setChannelMessage(`保存失败：${error.message}`, 'error'); }
+  finally { setButtonBusy(button, false); syncChannelFields(); }
 });
 
 function scoreClass(s, status) {
