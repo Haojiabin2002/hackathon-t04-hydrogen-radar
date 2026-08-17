@@ -21,6 +21,16 @@ from urllib.parse import urlparse
 
 TIMEOUT = int(os.getenv("RADAR_LLM_TIMEOUT", "180"))
 PROVIDER_IDS = ("codex_cli", "claude_cli", "openai_api", "openai_compatible")
+# Codex 是面向代码代理的 CLI；商机正文属于不可信网页输入，因此必须显式关闭
+# 所有非推理能力。旧版 CLI 若不认识这些开关会直接失败，不能退回到有工具模式。
+CODEX_DISABLED_FEATURES = (
+    "shell_tool", "unified_exec", "shell_snapshot",
+    "apps", "auth_elicitation", "browser_use", "browser_use_external",
+    "browser_use_full_cdp_access", "code_mode_host", "computer_use", "goals",
+    "guardian_approval", "hooks", "image_generation", "in_app_browser", "multi_agent",
+    "plugin_sharing", "plugins", "remote_plugin", "skill_mcp_dependency_install",
+    "skill_search", "tool_call_mcp_elicitation", "tool_suggest", "workspace_dependencies",
+)
 DEFAULT_CONFIG = {
     "provider": "claude_cli",
     "models": {
@@ -366,7 +376,10 @@ def _ask_codex(prompt: str, model: str, expect_json: bool) -> str:
                    "--ignore-user-config", "--ignore-rules",
                    "--skip-git-repo-check", "--sandbox", "read-only", "--color", "never",
                    "-c", 'shell_environment_policy.inherit="none"',
-                   "-C", work, "-o", str(output)]
+                   "-c", 'web_search="disabled"']
+        for feature in CODEX_DISABLED_FEATURES:
+            command.extend(["--disable", feature])
+        command.extend(["-C", work, "-o", str(output)])
         if model:
             command.extend(["--model", model])
         command.append("-")

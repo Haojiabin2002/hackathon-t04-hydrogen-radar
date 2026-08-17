@@ -107,6 +107,11 @@ class CLISafetyTests(unittest.TestCase):
         self.assertIn("read-only", seen["command"])
         self.assertIn("--ephemeral", seen["command"])
         self.assertEqual(seen["command"][1:4], ["--ask-for-approval", "never", "exec"])
+        disabled = {seen["command"][i + 1] for i, value in enumerate(seen["command"][:-1])
+                    if value == "--disable"}
+        self.assertTrue({"shell_tool", "unified_exec", "apps", "browser_use",
+                         "computer_use", "plugins"}.issubset(disabled))
+        self.assertIn('web_search="disabled"', seen["command"])
         self.assertNotIn("private prompt", seen["command"])
 
     def test_claude_has_no_tools_and_uses_stdin(self):

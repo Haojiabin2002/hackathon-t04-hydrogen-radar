@@ -41,6 +41,8 @@ bash radar/run.sh
 默认仍是原来的 Claude CLI，未主动保存设置时不会改变历史行为。选定通道失败会直接停止，
 不会静默换到其他模型。页面输入的 Key 不回显，保存在仓库外的
 `~/.config/hydrogen-radar/llm.json`（权限 `0600`）；部署环境优先使用环境变量。
+Codex 通道会显式关闭 shell、浏览器、应用连接器、插件等代理工具，只保留文本推理，
+避免公告正文中的提示注入借机读取本机或云端数据；不支持这些禁用开关的旧版 CLI 会安全失败。
 
 公网部署模型设置页时必须配置 `RADAR_SETTINGS_TOKEN`，并在请求中使用
 `Authorization: Bearer <token>` 或 `X-Radar-Settings-Token`。未配置口令时设置接口仅允许
