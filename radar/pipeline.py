@@ -138,6 +138,107 @@ def task2_extract_score(limit=None):
     print(f"[task2] 新增线索 {made} 条，判非商机 {rejected} 条")
 
 
+# ---------- 任务2.5：重复线索归并 ----------
+
+DEDUP_PROMPT = """你是氢能产业的商机分析师。下面是 {count} 条已识别的商机线索，
+它们来自不同媒体的公告，其中有一些其实指向**同一个采购标的**（同一个项目的同一次采购）。
+
+请把指向同一标的的线索分到一组。判定标准从严：
+
+【算同一标的】
+- 采购方与标的物一致，只是不同媒体转载或跟进报道（例：招标公告 + 后续中标公告）
+- 同一项目的同一批次设备，功率/规模一致
+
+【不算同一标的】
+- 同一家公司的不同项目、不同批次、不同标段
+- 采购方相同但标的物不同（例：都是中石化，但一个买电解槽一个买燃料电池车）
+- 仅仅是行业、区域或产品类型相同
+
+只有证据明确时才归并。**拿不准就不要归组**——错误归并会让销售漏掉一个真实商机，
+比放过一条重复线索严重得多。
+
+线索清单：
+{listing}
+
+严格只输出一个 JSON 对象，不要任何解释文字：
+{{
+  "groups": [
+    {{
+      "subject": "这一组共同指向的标的，一句话，须包含采购方与标的物，如：中原油田 PEM电解槽 1000Nm³/h",
+      "lead_ids": [上面清单里的 id，至少 2 个],
+      "evidence": "一句话说明凭什么判定它们是同一标的"
+    }}
+  ]
+}}
+
+若没有任何一组构成重复，输出 {{"groups": []}}。
+"""
+
+
+def _apply_groups(conn, groups, valid_ids):
+    """把模型给出的分组落库。留分数最高的一条，其余标 duplicate。
+
+    与模型调用分离，便于单独验证落库逻辑；只接受清单内的 id，
+    模型若返回清单外的 id 一律丢弃，不做任何猜测性补全。
+    """
+    seen = set()
+    merged = 0
+    for g in groups:
+        ids = [i for i in g.get("lead_ids", []) if i in valid_ids and i not in seen]
+        if len(ids) < 2:
+            continue
+        seen.update(ids)
+        # 只取仍是 new 的：已归并过的不再参与，重复执行本函数不会二次吸收
+        rows = conn.execute(
+            "SELECT l.id, l.score, s.source_url FROM leads l"
+            " JOIN signals s ON s.id=l.signal_id"
+            f" WHERE l.status='new' AND l.id IN ({','.join('?' * len(ids))})", ids).fetchall()
+        if len(rows) < 2:
+            continue
+        # 留分最高的；同分留 id 最小的（最早抓到的）
+        keep = max(rows, key=lambda r: ((r["score"] or 0), -r["id"]))
+        dups = [r for r in rows if r["id"] != keep["id"]]
+        if not dups:
+            continue
+
+        subject = (g.get("subject") or "").strip()[:120]
+        urls = " ".join(r["source_url"] for r in dups)
+        corroboration = (f"同一标的「{subject}」另有 {len(dups)} 个独立来源佐证：{urls}")
+
+        for r in dups:
+            conn.execute("UPDATE leads SET status='duplicate', dup_of=? WHERE id=?",
+                         (keep["id"], r["id"]))
+        conn.execute("UPDATE leads SET corroboration=? WHERE id=?",
+                     (corroboration, keep["id"]))
+        conn.commit()
+        merged += len(dups)
+        print(f"  [merge] lead#{keep['id']} 吸收 {[r['id'] for r in dups]} — {subject[:40]}")
+    return merged
+
+
+def task_dedup():
+    conn = connect()
+    rows = conn.execute(
+        "SELECT l.id, l.company, l.signal_type, l.power_range, l.region, l.amount,"
+        " s.title FROM leads l JOIN signals s ON s.id=l.signal_id"
+        " WHERE l.status='new' ORDER BY l.id").fetchall()
+    print(f"[dedup] 待查重线索 {len(rows)} 条")
+    if len(rows) < 2:
+        conn.close()
+        return
+
+    listing = "\n".join(
+        f"id={r['id']}｜采购方:{r['company'] or '未提及'}"
+        f"｜类型:{r['signal_type'] or '未知'}｜规模:{r['power_range'] or '未提及'}"
+        f"｜区域:{r['region'] or '未提及'}｜金额:{r['amount'] or '未提及'}"
+        f"｜标题:{r['title'][:60]}" for r in rows)
+
+    res = ask(DEDUP_PROMPT.format(count=len(rows), listing=listing))
+    merged = _apply_groups(conn, res.get("groups", []), {r["id"] for r in rows})
+    conn.close()
+    print(f"[dedup] 归并重复线索 {merged} 条")
+
+
 # ---------- 任务3：产品匹配 ----------
 
 MATCH_PROMPT = """你是氢璞创能的产品经理。根据下面的产品目录，为这条商机线索推荐最合适的产品型号。
@@ -170,7 +271,7 @@ def task3_match(limit=None):
     conn = connect()
     rows = conn.execute(
         "SELECT l.*, s.title, s.raw_text FROM leads l JOIN signals s ON s.id=l.signal_id"
-        " WHERE l.status!='rejected' AND (l.matched_product IS NULL OR l.matched_product='')"
+        " WHERE l.status='new' AND (l.matched_product IS NULL OR l.matched_product='')"
         " ORDER BY l.score DESC").fetchall()
     if limit:
         rows = rows[:limit]
@@ -221,7 +322,7 @@ def task4_cards(threshold=80):
     rows = conn.execute(
         "SELECT l.*, s.title, s.raw_text, s.source_url FROM leads l"
         " JOIN signals s ON s.id=l.signal_id"
-        " WHERE l.status!='rejected' AND l.score>=?"
+        " WHERE l.status='new' AND l.score>=?"
         " AND l.id NOT IN (SELECT lead_id FROM cards) ORDER BY l.score DESC",
         (threshold,)).fetchall()
     print(f"[task4] score>={threshold} 待出卡 {len(rows)} 条")
@@ -250,7 +351,7 @@ def task4_cards(threshold=80):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=["extract", "match", "cards", "all"])
+    ap.add_argument("stage", choices=["extract", "dedup", "match", "cards", "all"])
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--threshold", type=int, default=80)
     args = ap.parse_args()
@@ -264,6 +365,8 @@ if __name__ == "__main__":
     init_db()
     if args.stage in ("extract", "all"):
         task2_extract_score(args.limit)
+    if args.stage in ("dedup", "all"):
+        task_dedup()
     if args.stage in ("match", "all"):
         task3_match(args.limit)
     if args.stage in ("cards", "all"):

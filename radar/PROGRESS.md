@@ -4,7 +4,9 @@ LLM_MODE: live
 LLM_CHANNEL: session-subagent（会话内子 Agent，真实 Claude 推理）
 LLM_CHANNEL_NOTE: `claude -p` CLI 与 Python SDK 子进程通道均为 Not logged in（实测证据见 CHANNELS.md），
   故任务2/3/4 改由会话内子 Agent 执行——是真实模型推理，非 mock/预置应答/规则引擎。
-  领导在终端执行一次 `claude /login` 后，`bash run.sh` 即可用 CLI 通道全自动复现同样结果。
+  领导在终端执行一次 `claude /login` 后，`bash run.sh` 即可用 CLI 通道跑通全链路。
+  **注意**：CLI 通道从未实际跑通过（本机至今未登录），"复现同样结果"是推断而非实测，
+  真实复现记录见文末「契约漂移修复」一节。
 
 ## 任务0 复核结果（2026-08-14）
 
@@ -111,6 +113,9 @@ LLM 通道不可用：claude CLI 未登录，请在终端执行一次 `claude /l
 
 ## 最终结果：ACCEPT PASS
 
+> ⚠️ 这份结果来自本机那个 `radar.db`，**不能由当时的仓库代码从零重建**。
+> 原因与修复见文末「契约漂移修复（2026-08-16）」。
+
 ```
 signals(正文>100字)=60      leads(含评分理由)=29      matched=29
 cards=7   卡含[时机]=7 [推荐配置]=7 [切入话术]=7 [下一步]=7
@@ -154,3 +159,76 @@ ACCEPT PASS
 此时删库重跑会把已通过验收的 29 条线索与 7 张作战卡全部清空、令 ACCEPT PASS 退化为 FAIL，
 属任务书所述"结果比开工更糟"，故按规矩不执行，如实记录。
 执行 `claude /login` 后 `bash run.sh` 即可全自动从空库复现全链路。
+
+---
+
+## 契约漂移修复（2026-08-16）
+
+代码上传 GitHub 后，另一台机器从零建库复现，暴露出上面这些记录里最要命的一个问题：
+**P0-2 的重复归并功能只活在本机那个没进版本控制的 `radar.db` 里，代码从未提交。**
+
+### 症状
+
+从 GitHub 全新 clone、按 `db.py` 建空库后打接口：
+
+```
+/api/stats     → 200
+/api/signals   → 200
+/api/leads     → 500   no such column: l.dup_of
+```
+
+`radar_accept.sh` 倒数第三行 `curl -sf .../api/leads || fail`，所以**新机器验收必然 FAIL**。
+
+### 根因
+
+| 层 | 当时的状态 |
+|---|---|
+| 本机 `radar.db` | 有 `dup_of` / `corroboration` 两列，5 条 duplicate、4 条 corroboration，**由手工 ALTER TABLE + 会话内子 Agent 直接写入** |
+| `db.py` SCHEMA | 从未有过这两列 |
+| `pipeline.py` | 从未有过任何查重归并逻辑 |
+| `api.py` / 前端 | 正确地读这两列并渲染「交叉验证」 |
+
+也就是说：呈现侧照着一份口头契约写对了，数据侧的实现却停留在一次性 SQL 上，
+中间那份契约（`db.py`）谁也没去补。`radar.db` 不进 git，这个洞就一直没人看见。
+
+### 修复
+
+| 文件 | 改动 |
+|---|---|
+| `db.py` | `leads` 表补 `dup_of INTEGER` / `corroboration TEXT`；新增 `MIGRATIONS` 与 `migrate()`，对已建过库的人幂等补列 |
+| `pipeline.py` | 新增 `task_dedup()` 与 `_apply_groups()`，把 P0-2 描述的按标的归并逻辑真正实现为代码；`match`/`cards` 的过滤从 `status!='rejected'` 收紧为 `status='new'`，重复线索不再重复匹配、不再重复出卡 |
+| `run.sh` | 全链路 6 步扩为 7 步，`extract` 与 `match` 之间插入 `dedup` |
+
+归并规则（写死在 `DEDUP_PROMPT` 里）：只有采购方与标的物一致、仅媒体不同或招标/中标前后脚时才归并；
+同公司不同项目、不同批次、不同标段一律不合。留分数最高的一条，其余标 `duplicate` 并把
+`dup_of` 指向留用条目，留用条目的 `corroboration` 记下其余来源的 URL 供回源核对。
+提示词明确写了「拿不准就不要归组」——错误归并会漏掉真实商机，比放过重复线索严重。
+
+### 验证
+
+从零建库后三个接口全部 200，`no such column` 报错 0 条。
+
+落库逻辑单测（不调 LLM，覆盖 3 组场景）：
+
+```
+PASS  全新建库 leads 含 dup_of / corroboration
+PASS  旧库缺列 → migrate 补齐，存量数据未破坏，重复执行幂等
+PASS  同标的 3 条中留分最高者，其余标 duplicate 且 dup_of 指向留用条
+PASS  corroboration 文案与佐证链接正确
+PASS  模型返回清单外 id / 单条组 → 丢弃，未误伤无关线索
+PASS  重复执行不会二次归并
+```
+
+单测过程中发现并修掉一个真实缺陷：`_apply_groups` 初版没有排除已归并的条目，
+重复执行会二次吸收。已改为只取 `status='new'` 的行。
+
+### 仍未验证的部分（如实记录）
+
+`task_dedup()` 的 **LLM 调用段至今没有真跑过**——本机 `claude` CLI 仍未登录
+（`LLM_MODE: blocked`），按项目规矩不使用任何替代品，所以只验证了落库逻辑，
+没有验证模型的归并判断质量。登录后需要重跑一次 `pipeline.py dedup` 并复核归并结果是否合理。
+
+### 教训
+
+`radar.db` 不进 git 是对的，正是它把这个洞逼了出来。
+如果当初把数据库提交进仓库，这个问题会一路藏到评委那台机器上才爆。

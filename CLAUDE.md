@@ -38,7 +38,7 @@ hackathon-t04/
     ├── db.py                          ⛔ 数据契约 · 两人共有，改动需双方同意
     │
     ├── crawler.py                     【数据侧】抓公告 → 写入 signals 表
-    ├── pipeline.py                    【数据侧】抽取+打分 / 产品匹配 / 生成作战卡
+    ├── pipeline.py                    【数据侧】抽取打分 / 重复归并 / 产品匹配 / 作战卡
     ├── knowledge.yaml                 【数据侧】业务知识库：产品线、评分权重、区域优先级
     ├── llm.py                         【数据侧】大模型调用通道
     │
@@ -75,6 +75,15 @@ hackathon-t04/
 **2. `db.py` 里 `SCHEMA` 的表名和字段名**
 `signals` / `leads` / `cards` 三张表的字段名被验收脚本用 SQL 直接查询。
 改字段名 = 验收失败。**加新字段可以**（要两人同意），**改名或删除绝对不行**。
+
+> 加字段必须同时做三件事，缺一不可：
+> ① 写进 `SCHEMA`；② 在 `MIGRATIONS` 里登记一行（否则先建过库的人升级后仍然缺字段）；
+> ③ **写出往这个字段里写数据的代码**。
+>
+> 2026-08-16 就栽在第三件上：`dup_of` / `corroboration` 被手工 `ALTER TABLE` 加进本机数据库、
+> 数据由一次性 SQL 写入，前端照着渲染，但 `SCHEMA` 和 `pipeline.py` 里什么都没有。
+> 因为 `radar.db` 不进 git，别人 clone 下来从零建库直接 `no such column`，验收当场 FAIL。
+> **绝对不许直接对 `radar.db` 执行 SQL 改结构或补数据**——数据库里的一切都必须能由仓库里的代码重建。
 
 **3. `radar/radar.db` 的文件位置**
 验收脚本写死了 `cd radar && sqlite3 radar.db`。

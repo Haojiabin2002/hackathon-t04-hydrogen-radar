@@ -29,7 +29,12 @@ CREATE TABLE IF NOT EXISTS leads (
     match_reason    TEXT,
     status          TEXT DEFAULT 'new',
     created_at      TEXT NOT NULL,
-    FOREIGN KEY (signal_id) REFERENCES signals(id)
+    -- 同一标的被多家媒体报道时：重复条目的 dup_of 指向留用的那条，
+    -- 留用条目的 corroboration 记下佐证来源，供销售回源核对
+    dup_of          INTEGER,
+    corroboration   TEXT,
+    FOREIGN KEY (signal_id) REFERENCES signals(id),
+    FOREIGN KEY (dup_of) REFERENCES leads(id)
 );
 CREATE TABLE IF NOT EXISTS cards (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,15 +46,33 @@ CREATE TABLE IF NOT EXISTS cards (
 """
 
 
+# 建表语句是 IF NOT EXISTS，对已存在的旧库不会补列。
+# 新增字段必须同时登记在这里，否则先建过库的人升级后仍然缺字段。
+MIGRATIONS = [
+    ("leads", "dup_of", "INTEGER"),
+    ("leads", "corroboration", "TEXT"),
+]
+
+
 def connect():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
+def migrate(conn):
+    """幂等补列：已有该列就跳过，不影响存量数据。"""
+    for table, column, coltype in MIGRATIONS:
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
+            print(f"[db] migrate: 补齐 {table}.{column}")
+
+
 def init_db():
     conn = connect()
     conn.executescript(SCHEMA)
+    migrate(conn)
     conn.commit()
     conn.close()
     print(f"[db] schema ready at {DB_PATH}")
