@@ -9,14 +9,14 @@ import threading
 from pathlib import Path
 
 import yaml
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from db import connect
 
 # 全项目唯一版本号来源：改这里，OpenAPI、/api/stats、看板角标一起变
-VERSION = "0.2.0"
+VERSION = "0.0.2"
 
 app = FastAPI(title="氢能商机雷达 API", version=VERSION)
 WEB = Path(__file__).parent / "web"
@@ -643,6 +643,109 @@ def chat(body: ChatIn):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"模型调用失败：{type(e).__name__}: {e}")
     return {"lead_id": body.lead_id, "answer": answer}
+
+
+# ---------- 模型通道：进页面先探测，用户自己选用哪一个 ----------
+# 三条通道（Claude CLI / Codex CLI / 兼容 API）的实现与安全加固都在 llm.py 里，
+# 这里只做三件事：把探测结果吐给前端、代跑实测、把用户的选择存下来。
+# 存之前服务端一定会自己再测一次——和新增数据源同一个道理：
+# 前端说"我测过了"不算数，不然一个伪造请求就能把通道切到攻击者的接口上，
+# 而全部公告正文与 prompt 都会流过那个接口。
+
+_llm_lock = threading.Lock()
+
+
+def _guard_local(request: Request):
+    """挡跨站请求伪造。
+
+    服务只听 127.0.0.1，但浏览器里任何一个网页都能往 localhost:8000 发 POST。
+    切通道是高价值目标（改成攻击者的 Base URL 就能拿到全部抓取正文），必须挡。
+    做法：要求一个自定义头。浏览器发自定义头必须先过 CORS 预检，而本服务没开 CORS，
+    预检就会失败——跨站请求根本到不了这里。curl / 本地前端不受影响。
+    """
+    if request.headers.get("x-radar-local") != "1":
+        raise HTTPException(status_code=403,
+                            detail="缺少本地请求标记（防跨站伪造）。请从看板界面操作。")
+    origin = request.headers.get("origin")
+    if origin and not re.match(r"^https?://(127\.0\.0\.1|localhost)(:\d+)?$", origin):
+        raise HTTPException(status_code=403, detail=f"拒绝跨站来源 {origin}")
+
+
+class ChannelTestIn(BaseModel):
+    channel: str
+    base_url: str = ""
+    model: str = ""
+    api_key: str = ""
+    style: str = ""
+
+
+@app.get("/api/llm/channels")
+def list_channels():
+    """进设置页时调这个：只看装没装、配没配，不发模型请求、不花额度。
+
+    刻意不回传 api_key，只回 key_set 布尔值——密钥没有任何理由再离开本机一次。
+    """
+    try:
+        from llm import scan_channels
+        return scan_channels()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"通道探测失败：{type(e).__name__}: {e}")
+
+
+@app.post("/api/llm/channels/test")
+def test_channel_api(body: ChannelTestIn, request: Request):
+    """实测一条通道：发一次真实请求；CLI 通道再跑一次子进程隔离探针。
+
+    耗时是真的（CLI 首次含探针约 10-30 秒），因为结论必须来自真实调用。
+    """
+    _guard_local(request)
+    try:
+        from llm import test_channel, CHANNELS
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"LLM 模块不可用：{e}")
+    if body.channel not in CHANNELS:
+        raise HTTPException(status_code=400, detail=f"未知通道 {body.channel}")
+    api_cfg = {"base_url": body.base_url.strip(), "model": body.model.strip(),
+               "api_key": body.api_key, "style": body.style}
+    with _llm_lock:
+        return test_channel(body.channel, api_cfg)
+
+
+@app.put("/api/llm/channels")
+def set_channel(body: ChannelTestIn, request: Request):
+    """保存用户选定的通道。服务端先自己实测一遍，测不过就不存。
+
+    不存的理由：存了等于让整条管线切到一个没验证过的通道上，
+    下一次采集会连着几十条公告一起失败，而失败原因要翻日志才看得见。
+    """
+    _guard_local(request)
+    try:
+        from llm import test_channel, load_config, save_config, CHANNELS
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"LLM 模块不可用：{e}")
+    if body.channel not in CHANNELS:
+        raise HTTPException(status_code=400, detail=f"未知通道 {body.channel}")
+
+    cur = load_config()
+    api_cfg = dict(cur["api"])
+    if body.channel == "api":
+        if body.base_url.strip():
+            api_cfg["base_url"] = body.base_url.strip()
+        if body.model.strip():
+            api_cfg["model"] = body.model.strip()
+        if body.api_key:                      # 留空表示沿用已存的 Key，不清空
+            api_cfg["api_key"] = body.api_key
+        if body.style:
+            api_cfg["style"] = body.style
+
+    with _llm_lock:
+        res = test_channel(body.channel, api_cfg)
+        if not res.get("ok"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"该通道未通过实测，未保存：{res.get('reason', '未知原因')}")
+        saved = save_config({"channel": body.channel, "api": api_cfg})
+    return {"saved": True, "channel": saved["channel"], "test": res}
 
 
 @app.get("/api/llm/health")

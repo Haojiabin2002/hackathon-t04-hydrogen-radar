@@ -179,6 +179,25 @@
   button.ghost:disabled { opacity: .45; cursor: not-allowed; }
   a { color: var(--accent-ink); }
   .empty { padding: 26px; text-align: center; color: var(--ink-soft); }
+  .chrow { display: flex; gap: 13px; align-items: flex-start; padding: 14px;
+    border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; background: var(--surface); }
+  .chrow.on { border-color: var(--accent); background: var(--surface-2); }
+  .chrow.dead { opacity: .58; }
+  .chrow > .body { flex: 1; min-width: 0; }
+  .chrow .nm { font-weight: 650; font-size: 14px; }
+  .chrow .meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; line-height: 1.6; }
+  .chrow .acts { display: flex; gap: 7px; flex: none; align-items: center; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; margin-right: 6px; }
+  .pill.ok   { background: var(--ok-bg); color: var(--ok); }
+  .pill.bad  { background: var(--warn-bg); color: var(--warn); }
+  .pill.mid  { background: var(--hi-bg); color: var(--hi); }
+  .apiform { margin-top: 10px; display: none; }
+  .apiform.on { display: block; }
+  .apiform .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
+  .apiform input, .apiform select {
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 13px;
+    font-family: inherit; background: var(--surface); color: var(--ink); flex: 1; min-width: 170px; }
 </style>
 </head>
 <body>
@@ -196,6 +215,7 @@
   <button class="on" data-s="s1" role="tab">商机看板</button>
   <button data-s="s2" role="tab">信号流</button>
   <button data-s="s3" role="tab">数据源</button>
+  <button data-s="s4" role="tab">模型通道</button>
 </div>
 
 <div class="wrap">
@@ -238,6 +258,17 @@
     </div>
     <div id="srclist"></div>
   </section>
+
+  <!-- 模型通道：进页面自动探测三条通道，由用户自己选用哪一条 -->
+  <section class="screen" id="s4">
+    <div class="banner">进这一页会先做一次<b>快速探测</b>（只看装没装、配没配，不花额度）。
+      要真正启用某条通道，得点「测试并启用」——服务端会发一次真实请求，
+      CLI 通道还会额外跑一次<b>子进程隔离探针</b>：往目录外放一个随机口令，
+      让模型去读、去执行 shell，读到了就说明它仍带着工具能力，直接拒绝启用。
+      测不过就不保存，绝不留一条「看起来选上了、实际用不了」的通道。</div>
+    <div id="chlist"><div class="empty">探测中…</div></div>
+    <div id="chout"></div>
+  </section>
 </div>
 
 <script>
@@ -249,6 +280,7 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
   document.querySelectorAll('.screen').forEach(x => x.classList.remove('on'));
   b.classList.add('on'); $('#' + b.dataset.s).classList.add('on');
+  if (b.dataset.s === 's4') loadChannels();   // 进入模型通道页即探测
 });
 
 function scoreClass(s, status) {
@@ -567,6 +599,110 @@ async function collectNow() {
     alert('采集启动失败：' + e); $('#btn-collect').disabled = false; return;
   }
   setTimeout(loadRun, 800);
+}
+
+// ---------- 模型通道 ----------
+// 状态一律来自服务端的真实探测，前端不做任何"应该能用"的推断。
+let CH = null;
+
+// 所有会改状态的请求都带这个头：服务端拿它挡跨站伪造（见 api.py 的 _guard_local）
+const LOCAL_HEAD = { 'Content-Type': 'application/json', 'X-Radar-Local': '1' };
+
+const ISO_PILL = {
+  passed:   ['ok',  '隔离已实测通过'],
+  failed:   ['bad', '隔离探针未通过'],
+  untested: ['mid', '隔离未测'],
+};
+
+async function loadChannels() {
+  const box = $('#chlist');
+  try {
+    CH = await fetch('/api/llm/channels').then(r => r.json());
+  } catch (e) {
+    box.innerHTML = `<div class="probe bad">通道探测失败：${esc(String(e))}</div>`;
+    return;
+  }
+  box.innerHTML = CH.channels.map(c => {
+    const live = c.installed && c.configured;
+    const [ic, it] = ISO_PILL[c.isolation] || ISO_PILL.untested;
+    const badges =
+      (c.current ? '<span class="pill ok">当前在用</span>' : '') +
+      (c.installed ? '' : '<span class="pill bad">未安装</span>') +
+      (c.key === 'api' && !c.configured ? '<span class="pill mid">未填写</span>' : '') +
+      `<span class="pill ${ic}" title="${esc(c.isolation_detail || '尚未跑过隔离探针')}">${it}</span>`;
+    const form = c.key !== 'api' ? '' : `
+      <div class="apiform ${c.current || !c.configured ? 'on' : ''}" id="apiform">
+        <div class="row">
+          <input id="api-base" placeholder="Base URL，如 https://ark.cn-beijing.volces.com/api/v3"
+                 value="${esc(c.base_url || '')}">
+          <select id="api-style">
+            <option value="">自动判断接口风格</option>
+            <option value="openai"${c.style === 'openai' ? ' selected' : ''}>OpenAI 兼容 /chat/completions</option>
+            <option value="anthropic"${c.style === 'anthropic' ? ' selected' : ''}>Anthropic 原生 /v1/messages</option>
+          </select>
+        </div>
+        <div class="row">
+          <input id="api-model" placeholder="模型名，如 claude-opus-5 / deepseek-chat" value="${esc(c.model || '')}">
+          <input id="api-key" type="password" autocomplete="off"
+                 placeholder="${c.key_set ? '已保存（留空则沿用原 Key）' : 'API Key，只存本机 ~/.config，权限 0600'}">
+        </div>
+      </div>`;
+    return `<div class="chrow ${c.current ? 'on' : ''} ${live ? '' : 'dead'}">
+      <div class="body">
+        <div class="nm">${badges}${esc(c.name)}</div>
+        <div class="meta">${esc(c.detail)}</div>
+        ${form}
+      </div>
+      <div class="acts">
+        <button class="ghost" onclick="tryChannel('${c.key}', false)">仅测试</button>
+        <button class="act" onclick="tryChannel('${c.key}', true)">测试并启用</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function apiPayload(key) {
+  const p = { channel: key };
+  if (key === 'api') {
+    p.base_url = ($('#api-base') || {}).value || '';
+    p.model    = ($('#api-model') || {}).value || '';
+    p.api_key  = ($('#api-key')  || {}).value || '';
+    p.style    = ($('#api-style')|| {}).value || '';
+  }
+  return p;
+}
+
+async function tryChannel(key, enable) {
+  const out = $('#chout');
+  out.innerHTML = `<div class="probe warn">正在对 <b>${esc(key)}</b> 发真实请求…
+    ${key === 'api' ? '' : 'CLI 通道首次还要跑隔离探针，约 10-30 秒，请等它跑完。'}</div>`;
+  document.querySelectorAll('#chlist button').forEach(b => b.disabled = true);
+  try {
+    const r = await fetch('/api/llm/channels' + (enable ? '' : '/test'), {
+      method: enable ? 'PUT' : 'POST',
+      headers: LOCAL_HEAD, body: JSON.stringify(apiPayload(key)),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      out.innerHTML = `<div class="probe bad"><b>未通过，${enable ? '没有保存' : '不可用'}。</b>
+        <div class="nums">${esc(d.detail || JSON.stringify(d))}</div></div>`;
+      return;
+    }
+    const t = enable ? (d.test || {}) : d;
+    if (!t.ok) {
+      out.innerHTML = `<div class="probe bad"><b>测试未通过。</b>
+        <div class="nums">${esc(t.reason || '未知原因')}</div></div>`;
+      return;
+    }
+    out.innerHTML = `<div class="probe ok"><b>${enable ? '已启用 ' + esc(key) : esc(key) + ' 可用'}。</b>
+      <div class="nums">模型回了「${esc(t.reply || '')}」，耗时 ${t.latency_s}s。
+      ${t.isolation_detail ? '隔离探针：' + esc(t.isolation_detail) + '。' : ''}</div></div>`;
+    await loadChannels();
+  } catch (e) {
+    out.innerHTML = `<div class="probe bad">请求失败：${esc(String(e))}</div>`;
+  } finally {
+    document.querySelectorAll('#chlist button').forEach(b => b.disabled = false);
+  }
 }
 
 async function load() {

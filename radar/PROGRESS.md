@@ -1,12 +1,15 @@
 # 氢能商机雷达 MVP · 进度记录
 
 LLM_MODE: live
-LLM_CHANNEL: session-subagent（会话内子 Agent，真实 Claude 推理）
-LLM_CHANNEL_NOTE: `claude -p` CLI 与 Python SDK 子进程通道均为 Not logged in（实测证据见 CHANNELS.md），
-  故任务2/3/4 改由会话内子 Agent 执行——是真实模型推理，非 mock/预置应答/规则引擎。
-  领导在终端执行一次 `claude /login` 后，`bash run.sh` 即可用 CLI 通道跑通全链路。
-  **注意**：CLI 通道从未实际跑通过（本机至今未登录），"复现同样结果"是推断而非实测，
-  真实复现记录见文末「契约漂移修复」一节。
+LLM_CHANNEL: claude_cli（本机 claude CLI 子进程，走订阅额度）
+LLM_CHANNEL_NOTE: 2026-08-18 在终端完成登录后，CLI 通道已实测跑通全链路，不再依赖会话内子 Agent。
+  2026-08-19 起通道可配置，三选一，进「模型通道」页会先做一次快速探测：
+    · claude_cli — 本机已装已登录，当前在用
+    · codex_cli  — 本机未安装，界面如实标注，未安装即不可选
+    · api        — OpenAI 兼容 / Anthropic 原生，Key 存 ~/.config/hydrogen-radar/llm.json（0600，不进仓库）
+  切换通道时服务端会自己再实测一次，测不过就不保存；不做任何通道间自动降级。
+  CLI 子进程已加固（禁全部工具 + 禁 MCP + 空临时目录 + 最小环境变量 + prompt 走 stdin），
+  并有隔离探针实测把关：探针读得到目录外的口令或执行得了 shell，该通道即拒绝启用。
 
 ## 任务0 复核结果（2026-08-14）
 
