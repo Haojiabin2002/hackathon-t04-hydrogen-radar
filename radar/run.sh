@@ -41,4 +41,4 @@ else
 fi
 
 echo "启动服务 http://127.0.0.1:${PORT}"
-exec .venv/bin/uvicorn api:app --host 127.0.0.1 --port "$PORT"
+exec $PY -m uvicorn api:app --host 127.0.0.1 --port "$PORT"
