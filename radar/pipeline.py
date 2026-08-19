@@ -25,6 +25,24 @@ def now():
     return dt.datetime.now().isoformat(timespec="seconds")
 
 
+
+def _clean_industry(value, taxonomy):
+    """只接受分类表内的取值。模型自造类目就丢弃，宁可留空也不入库脏数据。"""
+    v = (value or "").strip()
+    return v if v in taxonomy else ""
+
+
+def _ask_retry(prompt, tries=2):
+    """调模型；仅对"响应格式不合法"重试。通道类错误直接上抛，不重试也不降级。"""
+    last = None
+    for _ in range(tries):
+        try:
+            return ask(prompt)
+        except ValueError as e:
+            last = e
+    raise last
+
+
 # ---------- 任务2：抽取 + 评分 ----------
 
 EXTRACT_PROMPT = """你是氢能产业的商机分析师。下面是一条从氢能行业媒体抓取的公告正文。
@@ -49,8 +67,13 @@ EXTRACT_PROMPT = """你是氢能产业的商机分析师。下面是一条从氢
   "power_range": "涉及的功率或产氢规模，如 300kW、1MW、500Nm3/h；未提及填空字符串",
   "region": "省或城市；未提及填空字符串",
   "amount": "金额或数量，如 650万元、35辆；未提及填空字符串",
-  "deadline": "截止或计划时间；未提及填空字符串"
+  "deadline": "截止或计划时间；未提及填空字符串",
+  "industry": "采购方所属行业，**只能从下面这份清单里原样挑一项**：{taxonomy}"
 }}
+
+【关于 industry 的说明】它与上面四个字段性质不同：它是**归类**，
+由采购方性质与标的用途判定，不要求在原文里逐字出现，但必须落在给定清单内，
+不得自造类目。判不准就填「其他」。
 
 公告标题：{title}
 公告正文：{body}
@@ -84,6 +107,7 @@ SCORE_PROMPT = """你是氢燃料电池厂商（氢璞创能）的销售总监�
 def task2_extract_score(limit=None):
     kb = load_kb()
     w = kb["scoring_weights"]
+    taxonomy = kb["industry_taxonomy"]
     conn = connect()
     rows = conn.execute(
         "SELECT s.* FROM signals s WHERE length(s.raw_text)>100 "
@@ -93,14 +117,20 @@ def task2_extract_score(limit=None):
         rows = rows[:limit]
     print(f"[task2] 待处理 signal {len(rows)} 条")
 
-    made = rejected = 0
+    made = rejected = skipped = 0
     for s in rows:
         body = s["raw_text"][:2500]
+        # 通道断了必须整体停做（死规矩）；单条响应格式坏了则重试一次后跳过，
+        # 不能让一条畸形 JSON 把整批任务带崩——跳过的条数最后如实汇报。
         try:
-            ext = ask(EXTRACT_PROMPT.format(title=s["title"], body=body))
-        except (LLMUnavailable, ValueError) as e:
-            print(f"  [fail] signal#{s['id']} 抽取失败: {e}")
+            ext = _ask_retry(EXTRACT_PROMPT.format(
+                title=s["title"], body=body, taxonomy="、".join(taxonomy)))
+        except LLMUnavailable:
             raise
+        except ValueError as e:
+            print(f"  [skip] signal#{s['id']} 抽取响应格式异常，跳过: {str(e)[:90]}")
+            skipped += 1
+            continue
 
         if not ext.get("is_opportunity"):
             reason = ext.get("reject_reason", "")[:200]
@@ -114,28 +144,39 @@ def task2_extract_score(limit=None):
             print(f"  [rejected] #{s['id']} {s['title'][:26]} — {reason[:40]}")
             continue
 
-        sc = ask(SCORE_PROMPT.format(
-            w_demand=w["demand_certainty"], w_power=w["power_match"],
-            w_customer=w["customer_type"], w_region=w["region_timing"],
-            company=ext.get("company", ""), signal_type=ext.get("signal_type", ""),
-            power_range=ext.get("power_range", ""), region=ext.get("region", ""),
-            amount=ext.get("amount", ""), title=s["title"], body=body[:1200]))
+        try:
+            sc = _ask_retry(SCORE_PROMPT.format(
+                w_demand=w["demand_certainty"], w_power=w["power_match"],
+                w_customer=w["customer_type"], w_region=w["region_timing"],
+                company=ext.get("company", ""), signal_type=ext.get("signal_type", ""),
+                power_range=ext.get("power_range", ""), region=ext.get("region", ""),
+                amount=ext.get("amount", ""), title=s["title"], body=body[:1200]))
+        except LLMUnavailable:
+            raise
+        except ValueError as e:
+            print(f"  [skip] signal#{s['id']} 评分响应格式异常，跳过: {str(e)[:90]}")
+            skipped += 1
+            continue
 
         conn.execute(
             "INSERT INTO leads (signal_id, company, signal_type, power_range, region,"
-            " amount, deadline, score, score_reason, status, created_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            " amount, deadline, score, score_reason, industry, status, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (s["id"], ext.get("company", ""), ext.get("signal_type", ""),
              ext.get("power_range", ""), ext.get("region", ""), ext.get("amount", ""),
              ext.get("deadline", ""), int(sc.get("score", 0)),
-             sc.get("score_reason", ""), "new", now()))
+             sc.get("score_reason", ""), _clean_industry(ext.get("industry"), taxonomy),
+             "new", now()))
         conn.commit()
         made += 1
         print(f"  [lead] #{s['id']} {ext.get('company','?')[:18]} "
               f"score={sc.get('score')} {s['title'][:24]}")
 
     conn.close()
-    print(f"[task2] 新增线索 {made} 条，判非商机 {rejected} 条")
+    msg = f"[task2] 新增线索 {made} 条，判非商机 {rejected} 条"
+    if skipped:
+        msg += f"，因响应格式异常跳过 {skipped} 条（未产出任何未经模型判定的数据）"
+    print(msg)
 
 
 # ---------- 任务2.5：重复线索归并 ----------

@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS leads (
     score_reason    TEXT,
     matched_product TEXT,
     match_reason    TEXT,
+    -- 所属行业：对齐氢璞样例客户信息表的字段。取值域见 knowledge.yaml
+    -- industry_taxonomy。这是归类字段而非原文摘录，界面按「归类」呈现。
+    industry        TEXT,
     status          TEXT DEFAULT 'new',
     created_at      TEXT NOT NULL,
     -- 同一标的被多家媒体报道时：重复条目的 dup_of 指向留用的那条，
@@ -51,6 +54,7 @@ CREATE TABLE IF NOT EXISTS cards (
 MIGRATIONS = [
     ("leads", "dup_of", "INTEGER"),
     ("leads", "corroboration", "TEXT"),
+    ("leads", "industry", "TEXT"),
 ]
 
 

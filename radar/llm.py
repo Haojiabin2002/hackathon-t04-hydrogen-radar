@@ -5,6 +5,7 @@
 """
 import json
 import os
+import sys
 import re
 import shutil
 import subprocess
@@ -32,6 +33,41 @@ def health_check():
     if out.returncode != 0 or not out.stdout.strip():
         return False, f"claude -p 异常 rc={out.returncode}: {combined[:200]}"
     return True, combined[:60]
+
+
+def _escape_inner_quotes(text):
+    """把 JSON 字符串值内部未转义的半角双引号补上反斜杠。
+
+    判定依据：串内遇到 " 时向后跳过空白，若下一个有效字符不是 , } ] : 也不是结尾，
+    说明它不是收尾引号，而是内容里的引号——转义它。纯语法修复，不触碰内容。
+    """
+    out, in_str, i, n = [], False, 0, len(text)
+    while i < n:
+        ch = text[i]
+        if not in_str:
+            out.append(ch)
+            if ch == '"':
+                in_str = True
+            i += 1
+            continue
+        if ch == "\\":
+            out.append(text[i:i + 2])
+            i += 2
+            continue
+        if ch == '"':
+            j = i + 1
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j >= n or text[j] in ",}]:":
+                out.append(ch)
+                in_str = False
+            else:
+                out.append('\\"')
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def ask(prompt, expect_json=True):
@@ -64,8 +100,21 @@ def ask(prompt, expect_json=True):
             text = brace.group(0)
     try:
         return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # 模型最常见的一种破损：字符串值内部夹了未转义的半角双引号，例如
+    #   "score_reason": "标的为"租赁并附购买选择权"，属实单"
+    # 只做转义修复，不改动任何字面内容；修不好照常抛错，绝不猜测或补全。
+    try:
+        fixed = _escape_inner_quotes(text)
+        out = json.loads(fixed)
     except json.JSONDecodeError as e:
         raise ValueError(f"模型输出非合法JSON: {raw[:300]}") from e
+    # 修复动作必须留痕：静默改写模型输出，改坏了没人知道。
+    print(f"[llm] 注意：模型输出的 JSON 含未转义引号，已做纯语法修复"
+          f"（原 {len(text)} 字 → {len(fixed)} 字）。原始片段：{text[:120]}",
+          file=sys.stderr)
+    return out
 
 
 if __name__ == "__main__":
