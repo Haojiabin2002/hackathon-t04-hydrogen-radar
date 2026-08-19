@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from db import connect
 
 # 全项目唯一版本号来源：改这里，OpenAPI、/api/stats、看板角标一起变
-VERSION = "0.0.2"
+VERSION = "0.2.1"
 
 app = FastAPI(title="氢能商机雷达 API", version=VERSION)
 WEB = Path(__file__).parent / "web"
