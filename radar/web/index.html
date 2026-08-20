@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>氢能商机雷达 · 氢璞创能</title>
+<title>氢能商机雷达 · 数字员工</title>
 <style>
   :root {
     --bg: #f2f5f7; --surface: #ffffff; --surface-2: #e8eef1;
@@ -202,12 +202,86 @@
   .apiform input, .apiform select {
     border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 13px;
     font-family: inherit; background: var(--surface); color: var(--ink); flex: 1; min-width: 170px; }
+
+  /* ---- 数字员工壳：左侧功能栏 + 主区 ---- */
+  .app { display: grid; grid-template-columns: 216px minmax(0,1fr); min-height: 100vh; }
+  .side { background: var(--surface); border-right: 1px solid var(--line);
+    padding: 14px 10px 12px; display: flex; flex-direction: column; gap: 3px;
+    position: sticky; top: 0; height: 100vh; overflow: auto; }
+  .side .brand { display: flex; gap: 10px; align-items: center; padding: 2px 8px 13px;
+    border-bottom: 1px solid var(--line); margin-bottom: 9px; }
+  .side .brand b { font-size: 14.5px; color: var(--accent-ink); display: block; line-height: 1.3; }
+  .side .brand small { font-size: 11px; color: var(--ink-soft); }
+  .avatar { width: 36px; height: 36px; border-radius: 10px; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; flex: none; }
+  .side button.nav { display: block; width: 100%; text-align: left; border: none; background: transparent;
+    color: var(--ink-soft); padding: 8px 12px; border-radius: 8px; cursor: pointer;
+    font-size: 13.8px; font-family: inherit; }
+  .side button.nav:hover { background: var(--surface-2); }
+  .side button.nav.on { background: var(--accent-soft); color: var(--accent-ink); font-weight: 650; }
+  .side .foot { margin-top: auto; padding: 10px 8px 0; border-top: 1px solid var(--line); }
+  .main { min-width: 0; }
+  .wrap { padding: 16px 22px 30px; }
+  .screen { border-radius: 10px; }
+  .chatwrap { max-width: 900px; margin: 0 auto; }
+  .chat-full { height: calc(100vh - 175px); position: static; }
+  .actionbtn { display: block; margin-top: 9px; border: 1px solid var(--accent); background: var(--accent);
+    color: #fff; border-radius: 7px; padding: 6px 14px; font-size: 12.5px; cursor: pointer;
+    font-family: inherit; font-weight: 600; }
+  .actionbtn:disabled { opacity: .55; cursor: default; }
+  .memrow { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 13px; margin-bottom: 8px; background: var(--surface); }
+  .memrow .c { flex: 1; font-size: 13.5px; }
+  .hourchips { display: flex; gap: 6px; flex-wrap: wrap; margin: 13px 0; }
+  .hourchips button { border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
+    border-radius: 7px; padding: 5px 0; width: 46px; cursor: pointer; font-size: 12.5px;
+    font-family: inherit; font-variant-numeric: tabular-nums; }
+  .hourchips button.on { background: var(--accent-soft); border-color: var(--accent);
+    color: var(--accent-ink); font-weight: 700; }
+  .schedbox { border: 1px solid var(--line); border-radius: 9px; padding: 16px 18px; background: var(--surface); }
+  .schedbox .row1 { display: flex; gap: 10px; align-items: center; }
+  .skrow { display: flex; gap: 13px; align-items: flex-start; border: 1px solid var(--line);
+    border-radius: 9px; padding: 14px 16px; margin-bottom: 10px; background: var(--surface); }
+  .skrow .ico { font-size: 20px; flex: none; }
+  .skrow .b { flex: 1; min-width: 0; }
+  .skrow .nm { font-weight: 650; font-size: 14px; }
+  .skrow .ds { font-size: 12.8px; color: var(--ink-soft); margin-top: 3px; line-height: 1.6; }
+  .kbsec { margin-bottom: 18px; }
+  .kbsec h4 { margin: 0 0 8px; font-size: 14px; color: var(--accent-ink); }
+  .chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 11px; font-size: 12.5px; margin: 0 6px 6px 0; color: var(--ink-soft); }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .side .brand { border: none; margin: 0; padding: 2px 8px; }
+    .side button.nav { width: auto; }
+    .side .foot { margin: 0; border: none; padding: 0; }
+    .chat-full { height: 68vh; }
+  }
 </style>
 </head>
 <body>
 
+<div class="app">
+<aside class="side">
+  <div class="brand">
+    <div class="avatar">氢</div>
+    <div><b>氢能商机雷达</b><small>数字员工 · 氢璞创能销售助理</small></div>
+  </div>
+  <button class="nav on" data-s="s0">💬 对话</button>
+  <button class="nav" data-s="s1">📋 商机看板</button>
+  <button class="nav" data-s="s2">📡 信号流</button>
+  <button class="nav" data-s="s3">🌐 数据源</button>
+  <button class="nav" data-s="s5">📚 知识库</button>
+  <button class="nav" data-s="s6">🧠 记忆</button>
+  <button class="nav" data-s="s7">⏰ 定时任务</button>
+  <button class="nav" data-s="s8">🛠️ 技能</button>
+  <button class="nav" data-s="s4">🔌 模型通道</button>
+  <div class="foot"><span class="ver" id="ver">v0.0.1</span></div>
+</aside>
+
+<div class="main">
 <div class="topbar">
-  <div class="logo">氢能商机雷达<small>氢璞创能 · 自动工作模式</small><span class="ver" id="ver">v0.0.1</span></div>
   <div class="stats" id="stats"></div>
   <div class="runbox">
     <div class="runinfo" id="runinfo">采集状态加载中…</div>
@@ -215,31 +289,26 @@
   </div>
 </div>
 
-<div class="tabs" role="tablist">
-  <button class="on" data-s="s1" role="tab">商机看板</button>
-  <button data-s="s2" role="tab">信号流</button>
-  <button data-s="s3" role="tab">数据源</button>
-  <button data-s="s4" role="tab">模型通道</button>
-</div>
-
 <div class="wrap">
-  <!-- 商机看板：主区卡片流 + 右侧对话面板 -->
-  <section class="screen on" id="s1">
-    <div class="workspace">
-      <div>
-        <div class="filters" id="filters"></div>
-        <div class="cardflow" id="cardflow"></div>
-      </div>
-      <div class="chat">
-        <h3>溯源对话<small id="chat-sub">全局模式：直接问整个看板</small></h3>
+  <!-- 首页：与数字员工的对话 -->
+  <section class="screen on" id="s0">
+    <div class="chatwrap">
+      <div class="chat chat-full">
+        <h3>对话<small id="chat-sub">全局模式：直接吩咐，或问整个看板</small></h3>
         <div class="msgs" id="msgs"></div>
         <div class="quick" id="quick"></div>
         <div class="composer">
-          <input id="q" placeholder="问整个看板，或点开一条线索问细节…" onkeydown="if(event.key==='Enter')sendChat()">
+          <input id="q" placeholder="问看板、要采集、让我记住偏好，都行…" onkeydown="if(event.key==='Enter')sendChat()">
           <button onclick="sendChat()">发送</button>
         </div>
       </div>
     </div>
+  </section>
+
+  <!-- 商机看板：纯卡片流，点卡片=把线索递给员工细问 -->
+  <section class="screen" id="s1">
+    <div class="filters" id="filters"></div>
+    <div class="cardflow" id="cardflow"></div>
   </section>
 
   <section class="screen" id="s2">
@@ -273,20 +342,71 @@
     <div id="chlist"><div class="empty">探测中…</div></div>
     <div id="chout"></div>
   </section>
+
+  <!-- 知识库：员工研判商机的依据，只读 -->
+  <section class="screen" id="s5">
+    <div class="banner">这是数字员工做评分与产品匹配的依据，来自 <b>knowledge.yaml</b>（数据侧维护）。
+      此处只读——评分标准的改动应该走文件修改与重新研判，不该在界面上随手改。</div>
+    <div id="kbout" class="empty">加载中…</div>
+  </section>
+
+  <!-- 记忆：销售的关注偏好，注入每轮对话 -->
+  <section class="screen" id="s6">
+    <div class="banner">长期记忆 = 你的关注偏好（例如「重点盯广东」「制氢设备优先」）。
+      每轮对话都会注入给员工；也可以在对话里直接说「记住：……」。上限 50 条，存本机不进仓库。</div>
+    <div class="addbox"><div class="row">
+      <input class="url" id="mem-in" placeholder="例如：重点关注广东省的制氢设备商机"
+             onkeydown="if(event.key==='Enter')addMemory()">
+      <button class="act" onclick="addMemory()">记住</button>
+    </div></div>
+    <div id="memlist"><div class="empty">加载中…</div></div>
+  </section>
+
+  <!-- 定时任务：员工的出勤表 -->
+  <section class="screen" id="s7">
+    <div class="banner">员工按下列时刻自动执行一轮「采集 → 研判 → 归并 → 配型 → 出卡」全链路，
+      每轮最多新增 25 条信号。点小时格子即改即存；正在采集时到点会顺延，不会并发跑两轮。</div>
+    <div class="schedbox">
+      <div class="row1">
+        <label class="sw"><input type="checkbox" id="sch-on" onchange="saveSchedule()"><span></span></label>
+        <b>启用定时执行</b>
+        <button class="act" style="margin-left:auto" onclick="collectNow()">立即执行一次</button>
+      </div>
+      <div class="hourchips" id="hourchips"></div>
+      <div id="schinfo" class="muted">加载中…</div>
+    </div>
+  </section>
+
+  <!-- 技能：员工现在真实具备的能力，没有摆设 -->
+  <section class="screen" id="s8">
+    <div class="banner">员工当前的能力清单。每一项背后都是真实在跑的链路——
+      这里没有「已安装但不可用」的摆设，也没有计划中的占位。</div>
+    <div id="skills"></div>
+  </section>
 </div>
+</div><!-- /.main -->
+</div><!-- /.app -->
 
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => (s ?? '').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let LEADS = [], FILTER = 'all', SEL = null, WAS_RUNNING = false;
+let LEADS = [], FILTER = 'all', SEL = null, WAS_RUNNING = false, STATS = null;
 const CARD_MD = {};   // 作战卡 markdown 原文，按 lead_id 缓存，供一键复制
 
-document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
+function navTo(id) {
+  document.querySelectorAll('.side button.nav').forEach(x => x.classList.toggle('on', x.dataset.s === id));
   document.querySelectorAll('.screen').forEach(x => x.classList.remove('on'));
-  b.classList.add('on'); $('#' + b.dataset.s).classList.add('on');
-  if (b.dataset.s === 's4') loadChannels();   // 进入模型通道页即探测
-});
+  $('#' + id).classList.add('on');
+  if (id === 's4') loadChannels();      // 模型通道：进页即探测
+  if (id === 's5') loadKnowledge();
+  if (id === 's6') loadMemory();
+  if (id === 's7') loadSchedule();
+  if (id === 's8') renderSkills();
+}
+document.querySelectorAll('.side button.nav').forEach(b => b.onclick = () => navTo(b.dataset.s));
+
+// 看板卡片点击 = 把这条线索递给员工细问：跳到对话页并选中
+function openLead(id) { navTo('s0'); selectLead(id); }
 
 function scoreClass(s, status) {
   if (status === 'rejected') return 's-rej';
@@ -341,7 +461,7 @@ function ageHtml(ts) {
 
 function leadCard(l) {
   const stage = STAGE[l.signal_type] || (l.signal_type || '—');
-  return `<div class="lcard ${SEL===l.id?'sel':''}" onclick="selectLead(${l.id})">
+  return `<div class="lcard ${SEL===l.id?'sel':''}" onclick="openLead(${l.id})">
     <div class="hd">
       <span class="score-pill ${scoreClass(l.score,l.status)}">${l.status==='rejected'?'非商机':(l.score ?? '—')}</span>
       <span class="co">${esc(l.company) || '<span class="muted">未提及主体</span>'}</span>
@@ -386,8 +506,10 @@ function setFilter(k) { FILTER = k; renderBoard(); }
 
 async function selectLead(id) {
   SEL = id; renderBoard();
-  const selEl = document.querySelector('.lcard.sel');
-  if (selEl) selEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if ($('#s1').classList.contains('on')) {
+    const selEl = document.querySelector('.lcard.sel');
+    if (selEl) selEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
   const l = LEADS.find(x => x.id === id);
   $('#chat-sub').textContent = `线索 #${id}　${l.company || '未提及主体'}`;
   $('#q').placeholder = `问线索 #${id} 的细节…`;
@@ -414,14 +536,17 @@ function ask(q) { $('#q').value = q; sendChat(); }
 // 回到全局模式：不选任何线索，对整个看板提问
 function chatHome() {
   SEL = null; renderBoard();
-  $('#chat-sub').textContent = '全局模式：直接问整个看板';
-  $('#q').placeholder = '问整个看板，或点开一条线索问细节…';
+  $('#chat-sub').textContent = '全局模式：直接吩咐，或问整个看板';
+  $('#q').placeholder = '问看板、要采集、让我记住偏好，都行…';
   $('#quick').innerHTML = [
-    '哪些线索值得今天就跟进？', '制氢设备相关的商机有哪些？', '海外线索情况怎么样？'
+    '哪些线索值得今天就跟进？', '制氢设备相关的商机有哪些？', '帮我采集一下最新数据'
   ].map(q => `<button onclick="ask('${q}')">${q}</button>`).join('');
+  const s = STATS || {};
   $('#msgs').innerHTML = `<div class="msg a">${esc(
-    `全局模式：当前 ${LEADS.filter(l => l.status !== 'rejected').length} 条在研线索。`
-    + `直接提问，回答会引用 #线索ID，点击即可跳转；点开左侧卡片可追问单条线索的原文细节。`)}</div>`;
+    `我在。当前盘面：真实信号 ${s.signals ?? '—'} 条（海外 ${s.overseas ?? '—'}），`
+    + `在研线索 ${s.leads ?? '—'} 条，判非商机 ${s.rejected ?? '—'} 条，作战卡 ${s.cards ?? '—'} 张待跟进。\n`
+    + `直接提问或吩咐——回答会引用 #线索ID，点击可跳转；`
+    + `要我采集数据、记住你的偏好，我会先说清动作、你点按钮确认才执行。`)}</div>`;
 }
 
 // 把回答里的 #123 变成可点击跳转——只认看板上真实存在的线索号，不给幻觉编号做链接
@@ -445,6 +570,142 @@ async function copyCard(id, btn) {
   setTimeout(() => { btn.textContent = '复制作战卡'; }, 2500);
 }
 
+// —— 动作协议：模型只提"提案"，这里把它渲染成按钮，点了才真执行 ——
+function appendA(text) {
+  const m = document.createElement('div');
+  m.className = 'msg a'; m.textContent = text;
+  $('#msgs').appendChild(m); $('#msgs').scrollTop = 1e9;
+}
+
+function actionEl(a) {
+  const label = { collect: '▶ 执行：立即采集并研判',
+                  open_lead: `▶ 打开线索 #${a.id}`,
+                  filter_board: '▶ 执行：按此筛选看板',
+                  remember: '▶ 确认记住这条偏好' }[a.type] || '▶ 执行';
+  const b = document.createElement('button');
+  b.className = 'actionbtn'; b.textContent = label;
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      if (a.type === 'collect') {
+        const r = await fetch('/api/collect', { method: 'POST' });
+        const d = await r.json();
+        appendA(d.started ? '已开始采集。进度看右上角状态，完成后各页数字自动更新。'
+                          : '没有启动：' + (d.reason || '未知原因'));
+        loadRun();
+      } else if (a.type === 'open_lead') {
+        selectLead(a.id);
+      } else if (a.type === 'filter_board') {
+        setFilter(a.filter); navTo('s1');
+      } else if (a.type === 'remember') {
+        const r = await fetch('/api/memory', { method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+          body: JSON.stringify({ content: a.content }) });
+        if (r.ok) { appendA('已记住：' + a.content + '（可在「记忆」页管理）'); }
+        else { const d = await r.json().catch(() => ({})); appendA('没记上：' + (d.detail || r.status)); b.disabled = false; }
+      }
+    } catch (e) { appendA('执行失败：' + e); b.disabled = false; }
+  };
+  return b;
+}
+
+// —— 知识库页 ——
+async function loadKnowledge() {
+  const box = $('#kbout');
+  try {
+    const kb = await fetch('/api/knowledge').then(r => r.json());
+    const w = kb.scoring_weights || {};
+    const wname = [['demand_certainty','需求确定性'],['power_match','功率匹配'],
+                   ['customer_type','客户类型'],['region_timing','区域时机']];
+    box.className = '';
+    box.innerHTML =
+      `<div class="kbsec"><h4>评分权重（满分 100）</h4><div>`
+      + wname.map(([k,n]) => `<span class="chip"><b>${n}</b> ${w[k] ?? '—'} 分</span>`).join('') + `</div></div>`
+      + `<div class="kbsec"><h4>产品谱系（${(kb.products||[]).length} 个型号，评分与配型只认这份清单）</h4>`
+      + `<div class="tablebox"><table><thead><tr><th>型号</th><th>参数</th><th>适用场景</th><th>目标客户</th></tr></thead><tbody>`
+      + (kb.products||[]).map(p => `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.spec||'—')}</td><td>${esc(p.scene||'—')}</td><td>${esc(p.customer_type||'—')}</td></tr>`).join('')
+      + `</tbody></table></div></div>`
+      + `<div class="kbsec"><h4>区域优先级（五大示范城市群）</h4><div>`
+      + Object.entries(kb.region_priority||{}).map(([k,v]) => `<span class="chip" title="${esc(v.note||'')}">${esc(k)} ×${v.weight}</span>`).join('') + `</div></div>`
+      + `<div class="kbsec"><h4>行业分类表（${(kb.industry_taxonomy||[]).length} 类，「所属行业」只能取这些值）</h4><div>`
+      + (kb.industry_taxonomy||[]).map(t => `<span class="chip">${esc(t)}</span>`).join('') + `</div></div>`;
+  } catch (e) { box.className = 'empty'; box.textContent = '加载失败：' + e; }
+}
+
+// —— 记忆页 ——
+async function loadMemory() {
+  const box = $('#memlist');
+  try {
+    const ms = await fetch('/api/memory').then(r => r.json());
+    box.innerHTML = ms.length
+      ? ms.map(m => `<div class="memrow"><div class="c">${esc(m.content)}</div>`
+          + `<span class="muted">${esc((m.created_at||'').slice(5,16).replace('T',' '))}</span>`
+          + `<button class="ghost" onclick="delMemory('${m.id}')">忘掉</button></div>`).join('')
+      : '<div class="empty">还没有记忆。加一条，或在对话里说「记住：重点盯广东」。</div>';
+  } catch (e) { box.innerHTML = '<div class="empty">加载失败：' + e + '</div>'; }
+}
+async function addMemory() {
+  const v = $('#mem-in').value.trim();
+  if (!v) return;
+  const r = await fetch('/api/memory', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+    body: JSON.stringify({ content: v }) });
+  if (r.ok) { $('#mem-in').value = ''; loadMemory(); }
+  else { const d = await r.json().catch(() => ({})); alert(d.detail || ('HTTP ' + r.status)); }
+}
+async function delMemory(id) {
+  const r = await fetch('/api/memory/' + id, { method: 'DELETE', headers: { 'X-Radar-Local': '1' } });
+  if (r.ok) loadMemory();
+}
+
+// —— 定时任务页 ——
+async function loadSchedule() {
+  try {
+    const st = await fetch('/api/collect/status').then(r => r.json());
+    $('#sch-on').checked = !!st.schedule_enabled;
+    $('#hourchips').innerHTML = Array.from({ length: 24 }, (_, h) =>
+      `<button class="${st.run_hours.includes(h) ? 'on' : ''}" onclick="toggleHour(this)">${h}:00</button>`).join('');
+    $('#schinfo').innerHTML =
+      `下次自动执行：${st.next_at ? fmt(st.next_at) : '（已停用）'}　·　上次：${st.last_at ? fmt(st.last_at) : '—'}`
+      + (st.last_result ? `　${esc(st.last_result)}` : '')
+      + (st.last_error ? `<br><span style="color:var(--warn)">上次错误：${esc(st.last_error)}</span>` : '')
+      + (st.last_skip ? `<br>${esc(st.last_skip)}` : '');
+  } catch (e) { $('#schinfo').textContent = '加载失败：' + e; }
+}
+async function toggleHour(btn) { btn.classList.toggle('on'); await saveSchedule(); }
+async function saveSchedule() {
+  const hours = [...$('#hourchips').querySelectorAll('button.on')].map(b => parseInt(b.textContent));
+  const r = await fetch('/api/schedule', { method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+    body: JSON.stringify({ schedule_enabled: $('#sch-on').checked, run_hours: hours }) });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    $('#schinfo').innerHTML = `<span style="color:var(--warn)">保存失败：${esc(d.detail || r.status)}</span>`;
+    return;
+  }
+  loadSchedule(); loadRun();
+}
+
+// —— 技能页：真实能力清单，数字来自实时统计 ——
+function renderSkills() {
+  const s = STATS || {};
+  const rows = [
+    ['📥', '信号采集与研判', '从白名单公告源真实抓取，模型抽取要素并四维评分，全程可回源核对；遇 WAF/验证码一律跳过不绕。每轮最多新增 25 条。',
+     `<button class="act" onclick="collectNow()">立即执行一次</button>`],
+    ['💬', '看板级分析对话', '基于漏斗统计与全部在研线索索引回答全局问题，回答强制引用 #线索ID，点击可跳转；答不了的会明说。',
+     `<button class="ghost" onclick="navTo('s0')">去对话</button>`],
+    ['🔍', '线索溯源问答', '选中任一线索后带公告原文回答"这条为什么出得来"，超出记录范围会拒答，不编。',
+     `<button class="ghost" onclick="navTo('s1')">去看板挑一条</button>`],
+    ['🧪', '新数据源探测', '粘一个网址就真抓一次、判断能不能当采集源，能用才允许保存——不做"保存了但永远零产出"。',
+     `<button class="ghost" onclick="navTo('s3')">去数据源</button>`],
+    ['🧬', '重复线索归并', `不同媒体报道同一标的时自动归并，留最高分并记录交叉验证来源。当前已归并 ${s.duplicate ?? '—'} 条。`, ''],
+    ['🗂️', '作战卡生成', `评分 ≥80 自动产出「时机 / 推荐配置 / 切入话术 / 下一步」作战卡，可一键复制。当前 ${s.cards ?? '—'} 张。`,
+     `<button class="ghost" onclick="setFilter('card');navTo('s1')">查看作战卡</button>`],
+  ];
+  $('#skills').innerHTML = rows.map(([i, n, d, a]) =>
+    `<div class="skrow"><div class="ico">${i}</div><div class="b"><div class="nm">${n}</div><div class="ds">${d}</div></div><div>${a}</div></div>`).join('');
+}
+
 async function sendChat() {
   const q = $('#q').value.trim();
   if (!q) return;
@@ -459,7 +720,10 @@ async function sendChat() {
     const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(body) });
     const d = await r.json();
-    if (r.ok) { wait.innerHTML = linkCites(d.answer); }
+    if (r.ok) {
+      wait.innerHTML = linkCites(d.answer);
+      if (d.action) wait.appendChild(actionEl(d.action));
+    }
     else { wait.className = 'msg e'; wait.textContent = d.detail || ('HTTP ' + r.status); }
   } catch (e) { wait.className = 'msg e'; wait.textContent = '请求失败：' + e; }
   $('#msgs').scrollTop = 1e9;
@@ -771,7 +1035,7 @@ async function load() {
     fetch('/api/signals').then(r => r.json()),
     fetch('/api/leads').then(r => r.json()),
   ]);
-  LEADS = leads;
+  LEADS = leads; STATS = st;
   if (st.version) $('#ver').textContent = 'v' + st.version;
   $('#stats').innerHTML = [
     ['signals','真实信号'], ['overseas','其中海外'], ['leads','在研线索'],
