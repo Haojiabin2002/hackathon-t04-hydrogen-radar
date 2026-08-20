@@ -155,8 +155,9 @@ def list_signals():
         " FROM signals ORDER BY COALESCE(published_at,'') DESC, id DESC").fetchall()
     conn.close()
     out = rows_to_dicts(rows)
+    os_keys = _overseas_source_keys()
     for r in out:
-        r["overseas"] = r["source"] in OVERSEAS_SOURCES
+        r["overseas"] = r["source"] in os_keys
     return out
 
 
