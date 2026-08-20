@@ -4,7 +4,7 @@
 新字段上线后，新抽取的线索由 pipeline.py 直接写入；存量线索则由本脚本补齐——
 **绝不允许手工对 radar.db 执行 SQL 补数据**。
 
-industry 是归类字段（取值域见 knowledge.yaml industry_taxonomy），
+industry 是归类字段（取值域见 knowledge.md industry_taxonomy），
 不要求在公告原文里逐字出现，但必须落在清单内，模型自造类目一律丢弃。
 """
 import sys

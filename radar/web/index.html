@@ -250,6 +250,21 @@
   .kbsec h4 { margin: 0 0 8px; font-size: 14px; color: var(--accent-ink); }
   .chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px;
     padding: 3px 11px; font-size: 12.5px; margin: 0 6px 6px 0; color: var(--ink-soft); }
+  .mdview { line-height: 1.75; }
+  .mdview h1 { font-size: 19px; margin: 0 0 10px; color: var(--accent-ink); }
+  .mdview h2 { font-size: 15.5px; margin: 22px 0 9px; padding-bottom: 5px;
+    border-bottom: 1px solid var(--line); color: var(--accent-ink); }
+  .mdview p { margin: 8px 0; }
+  .mdview ol, .mdview ul { margin: 8px 0; padding-left: 22px; }
+  .mdview li { margin: 3px 0; }
+  .mdview table { margin: 10px 0; }
+  .mdview code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .mdedit { width: 100%; min-height: 62vh; border: 1px solid var(--line); border-radius: 8px;
+    padding: 13px 15px; font-size: 13px; line-height: 1.7; background: var(--surface);
+    color: var(--ink); resize: vertical;
+    font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .kbbar { display: flex; gap: 9px; align-items: center; margin-bottom: 13px; flex-wrap: wrap; }
+  .kbbar .msg-inline { font-size: 12.5px; }
   @media (max-width: 900px) {
     .app { grid-template-columns: 1fr; }
     .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
@@ -345,9 +360,16 @@
 
   <!-- 知识库：员工研判商机的依据，只读 -->
   <section class="screen" id="s5">
-    <div class="banner">这是数字员工做评分与产品匹配的依据，来自 <b>knowledge.yaml</b>（数据侧维护）。
-      此处只读——评分标准的改动应该走文件修改与重新研判，不该在界面上随手改。</div>
+    <div class="banner">员工做研判的本体知识库，就是仓库里的 <b>knowledge.md</b>。
+      正文每一节都会原样注入对应环节的提示词——<b>改这里等于改员工的判断标准</b>。
+      保存前会校验；<b>改动只影响之后新研判的线索，已入库的分数不会自动重算</b>。</div>
+    <div class="kbbar">
+      <button class="act" id="kb-edit" onclick="kbToggle()">编辑</button>
+      <button class="ghost" id="kb-cancel" onclick="kbCancel()" style="display:none">取消</button>
+      <span class="muted" id="kb-msg"></span>
+    </div>
     <div id="kbout" class="empty">加载中…</div>
+    <textarea class="mdedit" id="kbedit" style="display:none" spellcheck="false"></textarea>
   </section>
 
   <!-- 记忆：销售的关注偏好，注入每轮对话 -->
@@ -609,27 +631,106 @@ function actionEl(a) {
   return b;
 }
 
-// —— 知识库页 ——
+// —— 知识库页：MD 本体库，可看可改 ——
+// 自带极简渲染器（标题/表格/列表/加粗/行内码），不引第三方库：
+// 这个页面要在离线、无 CDN 的评审机器上照常打得开。
+function mdRender(md) {
+  const inline = t => esc(t)
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+  const out = []; let i = 0; const lines = md.split('\n');
+  const closeList = st => { while (st.length) out.push(st.pop()); };
+  const stack = [];
+  while (i < lines.length) {
+    const ln = lines[i];
+    if (/^\|/.test(ln) && /^\|[\s:|-]+\|$/.test(lines[i + 1] || '')) {
+      closeList(stack);
+      const cells = r => r.split('|').slice(1, -1).map(c => c.trim());
+      const head = cells(ln); i += 2;
+      const rows = [];
+      while (i < lines.length && /^\|/.test(lines[i])) rows.push(cells(lines[i++]));
+      out.push('<div class="tablebox"><table><thead><tr>'
+        + head.map(h => `<th>${inline(h)}</th>`).join('') + '</tr></thead><tbody>'
+        + rows.map(r => '<tr>' + r.map(c => `<td>${inline(c)}</td>`).join('') + '</tr>').join('')
+        + '</tbody></table></div>');
+      continue;
+    }
+    let m;
+    if ((m = ln.match(/^(#{1,3})\s+(.*)$/))) {
+      closeList(stack); out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`);
+    } else if ((m = ln.match(/^\s*\d+\.\s+(.*)$/))) {
+      if (stack[stack.length - 1] !== '</ol>') { closeList(stack); out.push('<ol>'); stack.push('</ol>'); }
+      out.push(`<li>${inline(m[1])}</li>`);
+    } else if ((m = ln.match(/^\s*[-*]\s+(.*)$/))) {
+      if (stack[stack.length - 1] !== '</ul>') { closeList(stack); out.push('<ul>'); stack.push('</ul>'); }
+      out.push(`<li>${inline(m[1])}</li>`);
+    } else if (ln.trim() === '') {
+      closeList(stack);
+    } else {
+      closeList(stack); out.push(`<p>${inline(ln)}</p>`);
+    }
+    i++;
+  }
+  closeList(stack);
+  return out.join('');
+}
+
+let KB_RAW = '';
 async function loadKnowledge() {
   const box = $('#kbout');
   try {
     const kb = await fetch('/api/knowledge').then(r => r.json());
-    const w = kb.scoring_weights || {};
-    const wname = [['demand_certainty','需求确定性'],['power_match','功率匹配'],
-                   ['customer_type','客户类型'],['region_timing','区域时机']];
-    box.className = '';
-    box.innerHTML =
-      `<div class="kbsec"><h4>评分权重（满分 100）</h4><div>`
-      + wname.map(([k,n]) => `<span class="chip"><b>${n}</b> ${w[k] ?? '—'} 分</span>`).join('') + `</div></div>`
-      + `<div class="kbsec"><h4>产品谱系（${(kb.products||[]).length} 个型号，评分与配型只认这份清单）</h4>`
-      + `<div class="tablebox"><table><thead><tr><th>型号</th><th>参数</th><th>适用场景</th><th>目标客户</th></tr></thead><tbody>`
-      + (kb.products||[]).map(p => `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.spec||'—')}</td><td>${esc(p.scene||'—')}</td><td>${esc(p.customer_type||'—')}</td></tr>`).join('')
-      + `</tbody></table></div></div>`
-      + `<div class="kbsec"><h4>区域优先级（五大示范城市群）</h4><div>`
-      + Object.entries(kb.region_priority||{}).map(([k,v]) => `<span class="chip" title="${esc(v.note||'')}">${esc(k)} ×${v.weight}</span>`).join('') + `</div></div>`
-      + `<div class="kbsec"><h4>行业分类表（${(kb.industry_taxonomy||[]).length} 类，「所属行业」只能取这些值）</h4><div>`
-      + (kb.industry_taxonomy||[]).map(t => `<span class="chip">${esc(t)}</span>`).join('') + `</div></div>`;
+    KB_RAW = kb.content || '';
+    // frontmatter 是机器契约，渲染成结构化摘要；--- 之后的正文才走 Markdown
+    const parts = KB_RAW.split('---');
+    const body = parts.length >= 3 ? parts.slice(2).join('---') : KB_RAW;
+    const w = kb.meta?.scoring_weights || {};
+    const wname = { demand_certainty: '需求确定性', power_match: '功率匹配',
+                    customer_type: '客户类型', region_timing: '区域时机' };
+    box.className = 'mdview';
+    box.innerHTML = (kb.problems && kb.problems.length
+        ? `<div class="probe bad"><b>知识库当前不合法，管线会拒绝运行：</b>${esc(kb.problems.join('；'))}</div>`
+        : '')
+      + `<div class="kbsec"><h4>评分权重（机器契约 · 四项须合计 100）</h4><div>`
+      + Object.entries(wname).map(([k, n]) => `<span class="chip"><b>${n}</b> ${w[k] ?? '—'} 分</span>`).join('')
+      + `</div></div>`
+      + `<div class="kbsec"><h4>行业分类表（机器契约 · 「所属行业」的取值域，${(kb.meta?.industry_taxonomy || []).length} 类）</h4><div>`
+      + (kb.meta?.industry_taxonomy || []).map(t => `<span class="chip">${esc(t)}</span>`).join('')
+      + `</div></div>`
+      + mdRender(body);
+    $('#kb-msg').textContent = `权重合计 ${Object.values(kb.meta?.scoring_weights || {})
+      .reduce((a, b) => a + b, 0)} 分 · 行业分类 ${(kb.meta?.industry_taxonomy || []).length} 类 · `
+      + `${Object.keys(kb.sections || {}).length} 个小节`;
   } catch (e) { box.className = 'empty'; box.textContent = '加载失败：' + e; }
+}
+
+function kbToggle() {
+  const editing = $('#kbedit').style.display !== 'none';
+  if (!editing) {
+    $('#kbedit').value = KB_RAW;
+    $('#kbedit').style.display = ''; $('#kbout').style.display = 'none';
+    $('#kb-edit').textContent = '保存'; $('#kb-cancel').style.display = '';
+  } else { kbSave(); }
+}
+function kbCancel() {
+  $('#kbedit').style.display = 'none'; $('#kbout').style.display = '';
+  $('#kb-edit').textContent = '编辑'; $('#kb-cancel').style.display = 'none';
+  $('#kb-msg').textContent = '已取消，未保存';
+}
+async function kbSave() {
+  const btn = $('#kb-edit'); btn.disabled = true; $('#kb-msg').textContent = '校验并保存中…';
+  try {
+    const r = await fetch('/api/knowledge', { method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+      body: JSON.stringify({ content: $('#kbedit').value }) });
+    const d = await r.json();
+    if (!r.ok) { $('#kb-msg').innerHTML = `<span style="color:var(--warn)">未保存：${esc(d.detail || r.status)}</span>`; return; }
+    $('#kbedit').style.display = 'none'; $('#kbout').style.display = '';
+    btn.textContent = '编辑'; $('#kb-cancel').style.display = 'none';
+    await loadKnowledge();
+    $('#kb-msg').innerHTML = `<span style="color:var(--ok)">${esc(d.note)}</span>`;
+  } catch (e) { $('#kb-msg').textContent = '保存失败：' + e; }
+  finally { btn.disabled = false; }
 }
 
 // —— 记忆页 ——

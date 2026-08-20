@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS leads (
     score_reason    TEXT,
     matched_product TEXT,
     match_reason    TEXT,
-    -- 所属行业：对齐氢璞样例客户信息表的字段。取值域见 knowledge.yaml
+    -- 所属行业：对齐氢璞样例客户信息表的字段。取值域见 knowledge.md
     -- industry_taxonomy。这是归类字段而非原文摘录，界面按「归类」呈现。
     industry        TEXT,
     status          TEXT DEFAULT 'new',

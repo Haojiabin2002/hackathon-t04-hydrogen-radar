@@ -733,18 +733,52 @@ def del_memory(mid: str, request: Request):
     return {"deleted": mid}
 
 
+KB_MD_PATH = ROOT / "knowledge.md"
+_kb_lock = threading.Lock()
+
+
+class KnowledgeIn(BaseModel):
+    content: str
+
+
 @app.get("/api/knowledge")
 def get_knowledge():
-    """知识库只读呈现。它就是 knowledge.yaml——评分和配型的依据本来就该给人看。"""
+    """知识库本体：返回 Markdown 原文 + 解析结果，供界面渲染与编辑。"""
+    from pipeline import parse_kb, validate_kb
     try:
-        with open(ROOT / "knowledge.yaml", encoding="utf-8") as f:
-            kb = yaml.safe_load(f) or {}
-    except (OSError, yaml.YAMLError) as e:
+        text = KB_MD_PATH.read_text(encoding="utf-8")
+    except OSError as e:
         raise HTTPException(status_code=500, detail=f"知识库读取失败：{e}")
-    return {"products": kb.get("products", []),
-            "scoring_weights": kb.get("scoring_weights", {}),
-            "region_priority": kb.get("region_priority", {}),
-            "industry_taxonomy": kb.get("industry_taxonomy", [])}
+    try:
+        meta, sections = parse_kb(text)
+        problems = validate_kb(meta, sections)
+    except (ValueError, yaml.YAMLError) as e:
+        return {"content": text, "problems": [str(e)], "meta": {}, "sections": {}}
+    return {"content": text, "problems": problems,
+            "meta": {"scoring_weights": meta.get("scoring_weights", {}),
+                     "industry_taxonomy": meta.get("industry_taxonomy", [])},
+            "sections": sections}
+
+
+@app.put("/api/knowledge")
+def put_knowledge(body: KnowledgeIn, request: Request):
+    """保存知识库。先解析校验，不合法一律拒收——绝不允许写入一个会让管线瞎猜的文件。"""
+    _guard_local(request)
+    from pipeline import parse_kb, validate_kb
+    try:
+        meta, sections = parse_kb(body.content)
+    except (ValueError, yaml.YAMLError) as e:
+        raise HTTPException(status_code=400, detail=f"解析失败：{e}")
+    problems = validate_kb(meta, sections)
+    if problems:
+        raise HTTPException(status_code=400, detail="；".join(problems))
+    with _kb_lock:
+        tmp = str(KB_MD_PATH) + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(body.content)
+        os.replace(tmp, KB_MD_PATH)
+    return {"saved": True, "sections": list(sections.keys()),
+            "note": "已保存。改动只影响之后新研判的线索，已入库的分数不会自动重算。"}
 
 
 # ---------- 溯源问答：只回答"这条线索为什么出得来" ----------

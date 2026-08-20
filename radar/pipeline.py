@@ -13,12 +13,72 @@ import yaml
 from db import connect, init_db
 from llm import ask, health_check, LLMUnavailable
 
-KB_PATH = Path(__file__).parent / "knowledge.yaml"
+KB_PATH = Path(__file__).parent / "knowledge.md"
+
+# 正文里必须存在的小节。缺任何一节都直接报错停做——
+# 少一节意味着某个 prompt 会拿到空字符串，模型会在没有判据的情况下瞎猜，
+# 那比报错严重得多。
+REQUIRED_SECTIONS = ("产品谱系", "区域优先级", "商机判定规则", "评分口径")
+
+
+def parse_kb(text):
+    """把 knowledge.md 拆成 (frontmatter, {小节标题: 小节正文})。
+
+    机器契约（权重、行业分类表）走 frontmatter，必须结构化；
+    业务知识走正文，原样注入提示词——人怎么写，模型就怎么读。
+    """
+    if not text.startswith("---"):
+        raise ValueError("knowledge.md 缺少 YAML frontmatter（文件须以 --- 开头）")
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        raise ValueError("knowledge.md 的 frontmatter 没有闭合的 --- 分隔线")
+    meta = yaml.safe_load(parts[1]) or {}
+    body = parts[2]
+
+    sections, cur, buf = {}, None, []
+    for line in body.splitlines():
+        if line.startswith("## "):
+            if cur:
+                sections[cur] = "\n".join(buf).strip()
+            cur, buf = line[3:].strip(), []
+        elif cur:
+            buf.append(line)
+    if cur:
+        sections[cur] = "\n".join(buf).strip()
+    return meta, sections
+
+
+def validate_kb(meta, sections):
+    """返回问题清单，空列表表示合法。保存前与加载时都走这一关。"""
+    problems = []
+    w = meta.get("scoring_weights")
+    if not isinstance(w, dict):
+        problems.append("frontmatter 缺少 scoring_weights")
+    else:
+        need = ["demand_certainty", "power_match", "customer_type", "region_timing"]
+        missing = [k for k in need if not isinstance(w.get(k), int)]
+        if missing:
+            problems.append(f"scoring_weights 缺少或非整数：{'、'.join(missing)}")
+        elif sum(w[k] for k in need) != 100:
+            problems.append(f"四项权重之和必须为 100，当前为 {sum(w[k] for k in need)}")
+    tx = meta.get("industry_taxonomy")
+    if not isinstance(tx, list) or not tx or not all(isinstance(t, str) and t.strip() for t in tx):
+        problems.append("industry_taxonomy 必须是非空的字符串列表")
+    for s in REQUIRED_SECTIONS:
+        if not sections.get(s):
+            problems.append(f"正文缺少「## {s}」小节或该节为空")
+    return problems
 
 
 def load_kb():
     with open(KB_PATH, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        meta, sections = parse_kb(f.read())
+    problems = validate_kb(meta, sections)
+    if problems:
+        raise ValueError("knowledge.md 不合法：" + "；".join(problems))
+    return {"scoring_weights": meta["scoring_weights"],
+            "industry_taxonomy": meta["industry_taxonomy"],
+            "sections": sections}
 
 
 def now():
@@ -47,11 +107,10 @@ def _ask_retry(prompt, tries=2):
 
 EXTRACT_PROMPT = """你是氢能产业的商机分析师。下面是一条从氢能行业媒体抓取的公告正文。
 
-请判断它是否构成"氢燃料电池/制氢设备供应商的销售商机"，并抽取要素。
-以下都不算商机：
-1. 会展预告、政策解读、人事任免、行业综述、职业目录这类没有具体采购主体的内容；
-2. 标的物与氢能/燃料电池/制氢设备无关的采购——即使它是格式完整、有预算有截止日的正式招标，也判 false；
-3. 主角是同业竞争对手（其他燃料电池厂商、其他电解槽/制氢设备厂商）自身的产品发布或交付宣传，且未披露真实采购方。
+请按下面的判定规则，判断它是否构成销售商机，并抽取要素。
+
+【判定规则】
+{reject_rules}
 
 【字段抽取的硬约束】company / region / amount / deadline 只能填公告原文中**逐字出现**的内容。
 不要用行业常识补全：原文写"中原油田"就填"中原油田"，不要补成"河南濮阳"；
@@ -82,10 +141,19 @@ EXTRACT_PROMPT = """你是氢能产业的商机分析师。下面是一条从氢
 SCORE_PROMPT = """你是氢燃料电池厂商（氢璞创能）的销售总监，要给一条商机线索打分。
 
 评分维度与权重（满分100）：
-- 需求确定性 {w_demand} 分：已招标/已中标/已签约 高于 规划或意向
-- 功率匹配度 {w_power} 分：需求功率段与本公司产品谱系（2.2kW空冷/200kW/300kW/380kW/500kW/1MW电堆、250-1000Nm3/h PEM制氢）的贴合程度
-- 客户类型 {w_customer} 分：系统集成商、整车厂、终端大用能企业、船厂、电站业主为高分；与本公司同业的竞争对手为低分
-- 区域时机 {w_region} 分：京津冀/广东/河北/上海/河南 五大示范城市群内为高分；海外项目按可达性判断
+- 需求确定性 {w_demand} 分
+- 功率匹配度 {w_power} 分
+- 客户类型 {w_customer} 分
+- 区域时机 {w_region} 分
+
+【产品谱系】（功率匹配维度的判据，注意产氢类需求看 Nm³/h、电堆类看 kW）
+{catalog}
+
+【评分口径】
+{scoring_rubric}
+
+【区域优先级】
+{region_table}
 
 线索信息：
 公司：{company}
@@ -124,7 +192,8 @@ def task2_extract_score(limit=None):
         # 不能让一条畸形 JSON 把整批任务带崩——跳过的条数最后如实汇报。
         try:
             ext = _ask_retry(EXTRACT_PROMPT.format(
-                title=s["title"], body=body, taxonomy="、".join(taxonomy)))
+                title=s["title"], body=body, taxonomy="、".join(taxonomy),
+                reject_rules=kb["sections"]["商机判定规则"]))
         except LLMUnavailable:
             raise
         except ValueError as e:
@@ -148,6 +217,9 @@ def task2_extract_score(limit=None):
             sc = _ask_retry(SCORE_PROMPT.format(
                 w_demand=w["demand_certainty"], w_power=w["power_match"],
                 w_customer=w["customer_type"], w_region=w["region_timing"],
+                catalog=kb["sections"]["产品谱系"],
+                scoring_rubric=kb["sections"]["评分口径"],
+                region_table=kb["sections"]["区域优先级"],
                 company=ext.get("company", ""), signal_type=ext.get("signal_type", ""),
                 power_range=ext.get("power_range", ""), region=ext.get("region", ""),
                 amount=ext.get("amount", ""), title=s["title"], body=body[:1200]))
@@ -284,7 +356,7 @@ def task_dedup():
 
 MATCH_PROMPT = """你是氢璞创能的产品经理。根据下面的产品目录，为这条商机线索推荐最合适的产品型号。
 
-产品目录（只能从中选择，不得虚构型号）：
+产品谱系（只能从中选择，不得虚构型号）：
 {catalog}
 
 商机线索：
@@ -306,9 +378,7 @@ MATCH_PROMPT = """你是氢璞创能的产品经理。根据下面的产品目�
 
 def task3_match(limit=None):
     kb = load_kb()
-    catalog = "\n".join(
-        f"- {p['name']}｜参数:{p['spec']}｜适用场景:{p['scene']}｜目标客户:{p['customer_type']}"
-        for p in kb["products"])
+    catalog = kb["sections"]["产品谱系"]
     conn = connect()
     rows = conn.execute(
         "SELECT l.*, s.title, s.raw_text FROM leads l JOIN signals s ON s.id=l.signal_id"

@@ -28,7 +28,7 @@ hackathon-t04/
 │
 ├── radar_accept.sh                    ⛔ 验收脚本 · 任何人任何情况不得修改
 ├── prototype-v0.1.html                早期静态原型 · 只读参考，不再维护
-├── 氢璞商机判断.txt                     业务需求原文 · knowledge.yaml 的来源
+├── 氢璞商机判断.txt                     业务需求原文 · knowledge.md 的来源
 ├── T04_氢能产业商机与精准获客Agent/      主办方给的企业资料包（6 个 PDF/DOC）· 只读
 │
 └── radar/                             主程序
@@ -39,7 +39,7 @@ hackathon-t04/
     │
     ├── crawler.py                     【数据侧】抓公告 → 写入 signals 表
     ├── pipeline.py                    【数据侧】抽取打分 / 重复归并 / 产品匹配 / 作战卡
-    ├── knowledge.yaml                 【数据侧】业务知识库：产品线、评分权重、区域优先级
+    ├── knowledge.md                   【数据侧】业务知识库本体：frontmatter 存机器契约，正文注入提示词
     ├── llm.py                         【数据侧】大模型调用通道
     │
     ├── api.py                         【呈现侧】FastAPI 接口 + 托管前端 + 版本号来源
@@ -57,7 +57,7 @@ hackathon-t04/
 ```
 公告网站  →  crawler.py  →  signals 表  →  pipeline.py  →  leads 表  →  cards 表
                                               ↑                ↓
-                                        knowledge.yaml     api.py  →  web/index.html
+                                        knowledge.md       api.py  →  web/index.html
 ```
 
 三张表的定义全部在 `db.py` 里。**数据侧只往表里写，呈现侧只从表里读**，两边不互相调用代码。
@@ -123,7 +123,7 @@ hackathon-t04/
 | | 数据侧 | 呈现侧 |
 |---|---|---|
 | 负责人 | @Haojiabin2002 | @MristYun |
-| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.yaml`<br>`llm.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html` |
+| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.md`<br>`llm.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html` |
 | 只读不改 | `db.py`、呈现侧的所有文件 | `db.py`、数据侧的所有文件 |
 | 交界面 | 往 `leads` 表**写** | 从 `leads` 表**读** |
 
