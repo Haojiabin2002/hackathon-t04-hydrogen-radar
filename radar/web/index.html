@@ -191,6 +191,8 @@
   .chrow .nm { font-weight: 650; font-size: 14px; }
   .chrow .meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; line-height: 1.6; }
   .chrow .acts { display: flex; gap: 7px; flex: none; align-items: center; }
+  .skrow .acts { display: flex; gap: 7px; flex: none; align-items: center; }
+  .skrow .acts button { white-space: nowrap; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 999px;
     font-size: 11px; font-weight: 700; margin-right: 6px; }
   .pill.ok   { background: var(--ok-bg); color: var(--ok); }
@@ -401,8 +403,22 @@
 
   <!-- 技能：员工现在真实具备的能力，没有摆设 -->
   <section class="screen" id="s8">
-    <div class="banner">员工当前的能力清单。每一项背后都是真实在跑的链路——
-      这里没有「已安装但不可用」的摆设，也没有计划中的占位。</div>
+    <div class="banner">技能 = <b>radar/skills/</b> 下的 Markdown 文件：frontmatter 定元数据、正文就是提示词。
+      可增删改、可启停，启用后会出现在线索的操作区。技能里的模型<b>同样没有任何工具</b>，
+      只产出一段分析文本，不会产生副作用。</div>
+    <div class="kbbar">
+      <button class="act" onclick="skNew()">＋ 新建技能</button>
+      <span class="muted" id="sk-msg"></span>
+    </div>
+    <div id="sk-editor" style="display:none">
+      <div class="addbox"><div class="row">
+        <input class="url" id="sk-key" placeholder="文件名（中文/字母/数字，不含斜杠）">
+        <button class="act" onclick="skSave()">保存</button>
+        <button class="ghost" onclick="skCloseEditor()">取消</button>
+      </div>
+      <div class="muted" id="sk-ph" style="margin-top:8px"></div></div>
+      <textarea class="mdedit" id="sk-body" spellcheck="false"></textarea>
+    </div>
     <div id="skills"></div>
   </section>
 </div>
@@ -538,6 +554,8 @@ async function selectLead(id) {
   $('#quick').innerHTML = [
     '这条线索为什么出得来？', '评分依据在原文哪里？', '为什么推荐这个型号？'
   ].map(q => `<button onclick="ask('${q}')">${q}</button>`).join('')
+  + (SKILLS.custom || []).filter(s => s.enabled).map(s =>
+      `<button onclick="runSkill('${esc(s.key)}','${esc(s.name)}')">${esc(s.icon)} ${esc(s.name)}</button>`).join('')
   + `<button onclick="chatHome()" title="取消选中，回到对整个看板提问">« 返回全局</button>`;
   let intro = `已选中线索 #${id}。评分 ${l.score ?? '—'}｜${l.score_reason || '暂无评分理由'}`;
   if (l.corroboration) intro += `\n\n交叉验证：${l.corroboration}`;
@@ -787,24 +805,122 @@ async function saveSchedule() {
   loadSchedule(); loadRun();
 }
 
-// —— 技能页：真实能力清单，数字来自实时统计 ——
-function renderSkills() {
+// —— 技能页：内置能力（代码实现）+ 可装配技能（MD 文件）——
+let SKILLS = { builtin: [], custom: [], placeholders: {} };
+
+async function renderSkills() {
+  try { SKILLS = await fetch('/api/skills').then(r => r.json()); }
+  catch (e) { $('#skills').innerHTML = `<div class="empty">加载失败：${e}</div>`; return; }
+
+  const custom = SKILLS.custom.map(s => {
+    const bad = s.problems.length;
+    return `<div class="skrow ${bad || !s.enabled ? 'dead' : ''}">
+      <div class="ico">${esc(s.icon)}</div>
+      <div class="b"><div class="nm">${esc(s.name)}
+        ${bad ? '<span class="pill bad">不可用</span>'
+              : (s.enabled ? '<span class="pill ok">已启用</span>' : '<span class="pill mid">已停用</span>')}
+        </div>
+        <div class="ds">${esc(s.description)}</div>
+        ${bad ? `<div class="ds" style="color:var(--warn)">${esc(s.problems.join('；'))}</div>` : ''}
+      </div>
+      <div class="acts">
+        <label class="sw"><input type="checkbox" ${s.enabled ? 'checked' : ''}
+          ${bad ? 'disabled' : ''} onchange="skToggle('${esc(s.key)}')"><span></span></label>
+        <button class="ghost" onclick="skEdit('${esc(s.key)}')">编辑</button>
+        <button class="ghost" onclick="skDelete('${esc(s.key)}')">删除</button>
+      </div></div>`;
+  }).join('') || '<div class="empty">还没有自定义技能。点「＋ 新建技能」写一个。</div>';
+
   const s = STATS || {};
-  const rows = [
-    ['📥', '信号采集与研判', '从白名单公告源真实抓取，模型抽取要素并四维评分，全程可回源核对；遇 WAF/验证码一律跳过不绕。每轮最多新增 25 条。',
-     `<button class="act" onclick="collectNow()">立即执行一次</button>`],
-    ['💬', '看板级分析对话', '基于漏斗统计与全部在研线索索引回答全局问题，回答强制引用 #线索ID，点击可跳转；答不了的会明说。',
-     `<button class="ghost" onclick="navTo('s0')">去对话</button>`],
-    ['🔍', '线索溯源问答', '选中任一线索后带公告原文回答"这条为什么出得来"，超出记录范围会拒答，不编。',
-     `<button class="ghost" onclick="navTo('s1')">去看板挑一条</button>`],
-    ['🧪', '新数据源探测', '粘一个网址就真抓一次、判断能不能当采集源，能用才允许保存——不做"保存了但永远零产出"。',
-     `<button class="ghost" onclick="navTo('s3')">去数据源</button>`],
-    ['🧬', '重复线索归并', `不同媒体报道同一标的时自动归并，留最高分并记录交叉验证来源。当前已归并 ${s.duplicate ?? '—'} 条。`, ''],
-    ['🗂️', '作战卡生成', `评分 ≥80 自动产出「时机 / 推荐配置 / 切入话术 / 下一步」作战卡，可一键复制。当前 ${s.cards ?? '—'} 张。`,
-     `<button class="ghost" onclick="setFilter('card');navTo('s1')">查看作战卡</button>`],
-  ];
-  $('#skills').innerHTML = rows.map(([i, n, d, a]) =>
-    `<div class="skrow"><div class="ico">${i}</div><div class="b"><div class="nm">${n}</div><div class="ds">${d}</div></div><div>${a}</div></div>`).join('');
+  const builtin = SKILLS.builtin.map(b =>
+    `<div class="skrow"><div class="ico">${b.icon}</div>
+      <div class="b"><div class="nm">${esc(b.name)} <span class="pill ok">内置</span></div>
+      <div class="ds">${esc(b.description)}</div></div></div>`).join('');
+
+  $('#skills').innerHTML =
+    `<div class="kbsec"><h4>可装配技能（${SKILLS.custom.length} 个 · 文件在 radar/skills/）</h4>${custom}</div>`
+    + `<div class="kbsec"><h4>内置能力（${SKILLS.builtin.length} 项 · 代码链路，不可编辑）</h4>${builtin}</div>`;
+  $('#sk-msg').textContent = `已启用 ${SKILLS.custom.filter(x => x.enabled).length} 个技能`
+    + ` · 已归并 ${s.duplicate ?? '—'} 条 · 作战卡 ${s.cards ?? '—'} 张`;
+}
+
+const SK_TEMPLATE = `---
+name: 新技能
+description: 一句话说明这个技能干什么（技能页会显示）
+icon: 🧩
+scope: lead
+enabled: true
+---
+你是氢璞创能的销售顾问。请针对下面这条商机做分析。
+
+采购方：{company}
+区域：{region}
+公告原文：{raw_text}
+
+请回答……（把你要模型做的事写在这里）
+`;
+
+function skPlaceholderHtml() {
+  return '可用占位符：' + Object.entries(SKILLS.placeholders)
+    .map(([k, v]) => `<span class="chip">{${k}} ${esc(v)}</span>`).join('');
+}
+function skNew() {
+  $('#sk-key').value = ''; $('#sk-key').disabled = false;
+  $('#sk-body').value = SK_TEMPLATE;
+  $('#sk-ph').innerHTML = skPlaceholderHtml();
+  $('#sk-editor').style.display = ''; $('#sk-key').focus();
+}
+async function skEdit(key) {
+  const d = await fetch('/api/skills/' + encodeURIComponent(key)).then(r => r.json());
+  $('#sk-key').value = key; $('#sk-key').disabled = true;
+  $('#sk-body').value = d.content || '';
+  $('#sk-ph').innerHTML = skPlaceholderHtml();
+  $('#sk-editor').style.display = '';
+}
+function skCloseEditor() { $('#sk-editor').style.display = 'none'; $('#sk-msg').textContent = '已取消'; }
+
+async function skSave() {
+  const key = $('#sk-key').value.trim();
+  if (!key) { $('#sk-msg').innerHTML = '<span style="color:var(--warn)">请填文件名</span>'; return; }
+  const r = await fetch('/api/skills/' + encodeURIComponent(key), { method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+    body: JSON.stringify({ content: $('#sk-body').value }) });
+  const d = await r.json();
+  if (!r.ok) { $('#sk-msg').innerHTML = `<span style="color:var(--warn)">未保存：${esc(d.detail || r.status)}</span>`; return; }
+  skCloseEditor(); await renderSkills();
+  $('#sk-msg').innerHTML = `<span style="color:var(--ok)">已保存「${esc(d.name)}」</span>`;
+}
+async function skToggle(key) {
+  const r = await fetch(`/api/skills/${encodeURIComponent(key)}/toggle`,
+    { method: 'POST', headers: { 'X-Radar-Local': '1' } });
+  if (!r.ok) { const d = await r.json().catch(() => ({}));
+    $('#sk-msg').innerHTML = `<span style="color:var(--warn)">${esc(d.detail || r.status)}</span>`; }
+  renderSkills();
+}
+async function skDelete(key) {
+  if (!confirm(`删除技能「${key}」？文件会从 radar/skills/ 里移除。`)) return;
+  const r = await fetch('/api/skills/' + encodeURIComponent(key),
+    { method: 'DELETE', headers: { 'X-Radar-Local': '1' } });
+  if (r.ok) { renderSkills(); $('#sk-msg').textContent = '已删除 ' + key; }
+}
+
+// 在选中线索的对话里跑技能
+async function runSkill(key, name) {
+  if (!SEL) return;
+  const m = document.createElement('div');
+  m.className = 'msg u'; m.textContent = `【技能】${name}`;
+  $('#msgs').appendChild(m);
+  const wait = document.createElement('div');
+  wait.className = 'msg a'; wait.textContent = `${name} 执行中…`;
+  $('#msgs').appendChild(wait); $('#msgs').scrollTop = 1e9;
+  try {
+    const r = await fetch(`/api/skills/${encodeURIComponent(key)}/run`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lead_id: SEL }) });
+    const d = await r.json();
+    if (r.ok) { wait.innerHTML = linkCites(d.answer); }
+    else { wait.className = 'msg e'; wait.textContent = d.detail || ('HTTP ' + r.status); }
+  } catch (e) { wait.className = 'msg e'; wait.textContent = '执行失败：' + e; }
+  $('#msgs').scrollTop = 1e9;
 }
 
 async function sendChat() {
@@ -1137,6 +1253,10 @@ async function load() {
     fetch('/api/leads').then(r => r.json()),
   ]);
   LEADS = leads; STATS = st;
+  // 预载技能清单：线索快捷区要用它渲染技能按钮，不能等用户先逛过技能页
+  if (!SKILLS.custom.length) {
+    try { SKILLS = await fetch('/api/skills').then(r => r.json()); } catch (e) {}
+  }
   if (st.version) $('#ver').textContent = 'v' + st.version;
   $('#stats').innerHTML = [
     ['signals','真实信号'], ['overseas','其中海外'], ['leads','在研线索'],

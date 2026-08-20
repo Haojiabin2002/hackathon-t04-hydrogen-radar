@@ -40,6 +40,8 @@ hackathon-t04/
     ├── crawler.py                     【数据侧】抓公告 → 写入 signals 表
     ├── pipeline.py                    【数据侧】抽取打分 / 重复归并 / 产品匹配 / 作战卡
     ├── knowledge.md                   【数据侧】业务知识库本体：frontmatter 存机器契约，正文注入提示词
+    ├── skills.py                      【数据侧】可装配技能的解析/校验/装填
+    ├── skills/*.md                    【数据侧】技能文件：frontmatter 元数据 + 正文提示词
     ├── llm.py                         【数据侧】大模型调用通道
     │
     ├── api.py                         【呈现侧】FastAPI 接口 + 托管前端 + 版本号来源
@@ -123,7 +125,7 @@ hackathon-t04/
 | | 数据侧 | 呈现侧 |
 |---|---|---|
 | 负责人 | @Haojiabin2002 | @MristYun |
-| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.md`<br>`llm.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html` |
+| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.md`<br>`skills.py`<br>`skills/*.md`<br>`llm.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html` |
 | 只读不改 | `db.py`、呈现侧的所有文件 | `db.py`、数据侧的所有文件 |
 | 交界面 | 往 `leads` 表**写** | 从 `leads` 表**读** |
 
@@ -161,7 +163,7 @@ radar/__pycache__/              编译缓存
 升版本只改那一行，OpenAPI 文档、`/api/stats` 接口、看板右上角角标三处会一起变。
 `web/index.html` 里那个硬编码的 `v0.0.1` 只是接口没通时的兜底，**不要把它当第二个版本号来维护**。
 
-当前版本：`0.3.0`
+当前版本：`0.4.0`
 
 ---
 

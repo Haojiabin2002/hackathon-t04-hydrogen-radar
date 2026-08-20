@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from db import connect
 
 # 全项目唯一版本号来源：改这里，OpenAPI、/api/stats、看板角标一起变
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 app = FastAPI(title="氢能商机雷达 API", version=VERSION)
 WEB = Path(__file__).parent / "web"
@@ -758,6 +758,115 @@ def get_knowledge():
             "meta": {"scoring_weights": meta.get("scoring_weights", {}),
                      "industry_taxonomy": meta.get("industry_taxonomy", [])},
             "sections": sections}
+
+
+# ---------- 可装配技能 ----------
+# 技能 = skills/ 下的 Markdown 文件（frontmatter 元数据 + 正文提示词）。
+# 内置能力是代码链路、不可编辑，界面上分栏标明，避免"改文件就能改行为"的错觉。
+
+BUILTIN_SKILLS = [
+    {"icon": "📥", "name": "信号采集与研判", "builtin": True,
+     "description": "从白名单公告源真实抓取，模型抽取要素并四维评分，全程可回源核对；"
+                    "遇 WAF/验证码一律跳过不绕。每轮最多新增 25 条。"},
+    {"icon": "💬", "name": "看板级分析对话", "builtin": True,
+     "description": "基于漏斗统计与全部在研线索索引回答全局问题，回答强制引用 #线索ID；"
+                    "可提出采集/筛选/记忆等动作，经你确认后才执行。"},
+    {"icon": "🔍", "name": "线索溯源问答", "builtin": True,
+     "description": "选中线索后带公告原文回答「这条为什么出得来」，超出记录范围会拒答。"},
+    {"icon": "🧪", "name": "新数据源探测", "builtin": True,
+     "description": "粘一个网址就真抓一次、判断能不能当采集源，能用才允许保存。"},
+    {"icon": "🧬", "name": "重复线索归并", "builtin": True,
+     "description": "不同媒体报道同一标的时自动归并，留最高分并记录交叉验证来源。"},
+    {"icon": "🗂️", "name": "作战卡生成", "builtin": True,
+     "description": "评分 ≥80 自动产出「时机 / 推荐配置 / 切入话术 / 下一步」作战卡。"},
+]
+
+
+class SkillIn(BaseModel):
+    content: str
+
+
+class SkillRunIn(BaseModel):
+    lead_id: int
+
+
+@app.get("/api/skills")
+def list_skills():
+    import skills as sk
+    return {"builtin": BUILTIN_SKILLS, "custom": sk.load_all(),
+            "placeholders": sk.PLACEHOLDERS}
+
+
+@app.get("/api/skills/{key}")
+def get_skill(key: str):
+    import skills as sk
+    try:
+        return {"key": key, "content": sk.read_raw(key)}
+    except sk.SkillError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.put("/api/skills/{key}")
+def put_skill(key: str, body: SkillIn, request: Request):
+    _guard_local(request)
+    import skills as sk
+    try:
+        meta = sk.save(key, body.content)
+    except sk.SkillError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"saved": True, "key": key, "name": meta.get("name", key)}
+
+
+@app.post("/api/skills/{key}/toggle")
+def toggle_skill(key: str, request: Request):
+    _guard_local(request)
+    import skills as sk
+    try:
+        cur = next((s for s in sk.load_all() if s["key"] == key), None)
+        if cur is None:
+            raise sk.SkillError(f"技能 {key} 不存在")
+        if cur["problems"]:
+            raise sk.SkillError("该技能当前不合法，先修好再启用：" + "；".join(cur["problems"]))
+        return {"key": key, "enabled": sk.set_enabled(key, not cur["enabled"])}
+    except sk.SkillError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/skills/{key}")
+def delete_skill(key: str, request: Request):
+    _guard_local(request)
+    import skills as sk
+    try:
+        sk.delete(key)
+    except sk.SkillError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"deleted": key}
+
+
+@app.post("/api/skills/{key}/run")
+def run_skill(key: str, body: SkillRunIn):
+    """在一条线索上跑技能。模型在这里同样没有工具，只产出一段分析文本。"""
+    import skills as sk
+    conn = connect()
+    row = conn.execute(
+        "SELECT l.*, s.title, s.raw_text, s.source_url FROM leads l"
+        " JOIN signals s ON s.id=l.signal_id WHERE l.id=?", (body.lead_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"lead {body.lead_id} 不存在")
+    try:
+        meta, prompt = sk.build_prompt(key, row)
+    except sk.SkillError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    try:
+        from llm import ask, LLMUnavailable
+        answer = ask(prompt, expect_json=False)
+    except LLMUnavailable as e:
+        raise HTTPException(status_code=503, detail=f"LLM 通道不可用：{e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"模型调用失败：{type(e).__name__}: {e}")
+    return {"key": key, "name": meta.get("name", key),
+            "lead_id": body.lead_id, "answer": answer}
 
 
 @app.put("/api/knowledge")
