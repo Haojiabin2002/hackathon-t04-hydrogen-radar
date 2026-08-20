@@ -57,7 +57,18 @@ def trace_field(value: str, raw_text: str):
             missing)
 
 
-OVERSEAS_SOURCES = {"TED欧盟招标"}
+def _overseas_source_keys():
+    """海外源清单来自 sources.yaml 的 overseas 标记。
+    数据源既然可增删，"哪些算海外"就必须跟着配置走：写死站点名的话，
+    用户新加一个海外源，它的线索永远不会被标成海外，统计也数不到它。"""
+    try:
+        cfgs = _load_sources_file().get("sources", [])
+    except (OSError, yaml.YAMLError):
+        # 配置文件读不到时只影响海外徽标，不把整个看板拖下水；
+        # 除这两种"文件不可用"外的异常照常抛——宽捕获会把真 bug 吞成静默退化。
+        return set()
+    return {c.get("key") for c in cfgs
+            if isinstance(c, dict) and c.get("overseas") and c.get("key")}
 
 
 @app.get("/api/leads")
@@ -76,12 +87,13 @@ def list_leads():
         " WHERE l.status!='duplicate'"
         " ORDER BY (l.score IS NULL), l.score DESC, l.id DESC").fetchall()
     conn.close()
+    os_keys = _overseas_source_keys()
     out = []
     for r in rows_to_dicts(rows):
         raw = r.pop("_raw", "") or ""
         r["region_trace"], r["region_unsourced"] = trace_field(r.get("region", ""), raw)
         r["company_trace"], r["company_unsourced"] = trace_field(r.get("company", ""), raw)
-        r["overseas"] = r.get("source") in OVERSEAS_SOURCES
+        r["overseas"] = r.get("source") in os_keys
         # 联系方式：只认原文里逐字出现的，抽不到就是抽不到，不推断
         r["contact"] = extract_contact(raw)
         out.append(r)
@@ -183,8 +195,11 @@ def stats():
                           " WHERE l.status='duplicate'"),
         "high": q("SELECT COUNT(*) FROM leads"
                   " WHERE status='new' AND coalesce(score,0)>=80"),
-        "overseas": q("SELECT COUNT(*) FROM signals WHERE source='TED欧盟招标'"),
     }
+    os_keys = _overseas_source_keys()
+    data["overseas"] = (conn.execute(
+        f"SELECT COUNT(*) FROM signals WHERE source IN ({','.join('?' * len(os_keys))})",
+        tuple(os_keys)).fetchone()[0] if os_keys else 0)
     conn.close()
     return data
 

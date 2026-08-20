@@ -774,8 +774,8 @@ async function load() {
   LEADS = leads;
   if (st.version) $('#ver').textContent = 'v' + st.version;
   $('#stats').innerHTML = [
-    ['signals','真实信号'], ['overseas','其中海外'], ['leads','有效线索'],
-    ['matched','已配型号'], ['cards','作战卡'], ['pending','待研判'],
+    ['signals','真实信号'], ['overseas','其中海外'], ['leads','在研线索'],
+    ['rejected','判非商机'], ['matched','已配型号'], ['cards','作战卡'], ['pending','待研判'],
   ].map(([k,l]) => `<div class="stat"><div class="k num">${st[k]}</div><div class="lbl">${l}</div></div>`).join('')
   // 归并后失效的作战卡：后端特意算了这个数，前端丢掉就等于把它藏了
   + (st.cards_orphan ? `<div class="stat" title="这些作战卡所属线索已被归并为重复，界面上不再可达，故不计入左侧作战卡数">`

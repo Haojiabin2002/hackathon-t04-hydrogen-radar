@@ -43,6 +43,7 @@ sources:
   name: TED 欧盟公共采购（api.ted.europa.eu）
   enabled: true
   kind: ted_api
+  overseas: true    # 海外源标记：看板的「海外」徽标与统计按这个字段算，不写死在代码里
   quota: 20
   queries:
   - label: 氢+燃料电池
