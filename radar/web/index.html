@@ -129,6 +129,10 @@
   .msg.a { background: var(--surface); border: 1px solid var(--line); align-self: flex-start; }
   .msg.e { background: var(--warn-bg); color: var(--warn); align-self: flex-start; }
   .quick { display: flex; gap: 5px; flex-wrap: wrap; padding: 0 14px 9px; }
+  .msg .lk { color: var(--accent-ink); text-decoration: underline; cursor: pointer; font-weight: 600; }
+  .copybtn { display: block; margin-top: 7px; border: 1px solid var(--line); background: var(--surface);
+             color: var(--ink-soft); border-radius: 6px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
+  .copybtn:hover { border-color: var(--accent); color: var(--accent-ink); }
   .quick button { border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
     font-size: 11.5px; padding: 4px 9px; border-radius: 999px; cursor: pointer; font-family: inherit; }
   .quick button:hover { border-color: var(--accent); color: var(--accent-ink); }
@@ -227,11 +231,11 @@
         <div class="cardflow" id="cardflow"></div>
       </div>
       <div class="chat">
-        <h3>溯源对话<small id="chat-sub">选一条线索，问它为什么出得来</small></h3>
+        <h3>溯源对话<small id="chat-sub">全局模式：直接问整个看板</small></h3>
         <div class="msgs" id="msgs"></div>
         <div class="quick" id="quick"></div>
         <div class="composer">
-          <input id="q" placeholder="问这条线索…" onkeydown="if(event.key==='Enter')sendChat()">
+          <input id="q" placeholder="问整个看板，或点开一条线索问细节…" onkeydown="if(event.key==='Enter')sendChat()">
           <button onclick="sendChat()">发送</button>
         </div>
       </div>
@@ -275,6 +279,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => (s ?? '').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let LEADS = [], FILTER = 'all', SEL = null, WAS_RUNNING = false;
+const CARD_MD = {};   // 作战卡 markdown 原文，按 lead_id 缓存，供一键复制
 
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
@@ -322,6 +327,18 @@ function classified(v) {
 }
 
 
+// 发布时效：招标有窗口期，三个月前的公告和昨天的公告不该长得一样。
+// 只做展示提醒，不参与打分——打分维度的改动是数据侧的事。
+function ageHtml(ts) {
+  if (!ts) return '<span class="muted" style="margin-left:auto">日期未载</span>';
+  const d = Math.floor((Date.now() - new Date(ts.replace(' ', 'T'))) / 86400000);
+  if (isNaN(d)) return `<span class="muted" style="margin-left:auto">${esc(ts.slice(0, 10))}</span>`;
+  const label = d <= 0 ? '今天发布' : d < 30 ? `${d} 天前发布` : d < 90 ? `${Math.floor(d/30)} 个月前发布` : `${Math.floor(d/30)} 个月前·较旧`;
+  return d >= 90
+    ? `<span class="tag stale" style="margin-left:auto" title="公告发布于 ${esc(ts.slice(0,16))}，距今 ${d} 天，跟进前先确认商机是否仍有效">${label}</span>`
+    : `<span class="muted" style="margin-left:auto" title="公告发布于 ${esc(ts.slice(0,16))}">${label}</span>`;
+}
+
 function leadCard(l) {
   const stage = STAGE[l.signal_type] || (l.signal_type || '—');
   return `<div class="lcard ${SEL===l.id?'sel':''}" onclick="selectLead(${l.id})">
@@ -343,7 +360,7 @@ function leadCard(l) {
       ${l.matched_product ? `<span class="tag">${esc(l.matched_product)}</span>` : '<span class="tag none">未配型号</span>'}
       ${l.has_card ? '<span class="tag ok">有作战卡</span>' : ''}
       <a href="${esc(l.source_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">回源核对 ↗</a>
-      <span class="muted" style="margin-left:auto">${esc((l.published_at||'').slice(0,10)) || '日期未载'}</span>
+      ${ageHtml(l.published_at)}
     </div>
   </div>`;
 }
@@ -369,37 +386,80 @@ function setFilter(k) { FILTER = k; renderBoard(); }
 
 async function selectLead(id) {
   SEL = id; renderBoard();
+  const selEl = document.querySelector('.lcard.sel');
+  if (selEl) selEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   const l = LEADS.find(x => x.id === id);
   $('#chat-sub').textContent = `线索 #${id}　${l.company || '未提及主体'}`;
+  $('#q').placeholder = `问线索 #${id} 的细节…`;
   $('#quick').innerHTML = [
     '这条线索为什么出得来？', '评分依据在原文哪里？', '为什么推荐这个型号？'
-  ].map(q => `<button onclick="ask('${q}')">${q}</button>`).join('');
+  ].map(q => `<button onclick="ask('${q}')">${q}</button>`).join('')
+  + `<button onclick="chatHome()" title="取消选中，回到对整个看板提问">« 返回全局</button>`;
   let intro = `已选中线索 #${id}。评分 ${l.score ?? '—'}｜${l.score_reason || '暂无评分理由'}`;
   if (l.corroboration) intro += `\n\n交叉验证：${l.corroboration}`;
   $('#msgs').innerHTML = `<div class="msg a">${esc(intro)}</div>`;
   if (l.has_card) {
     const r = await fetch(`/api/leads/${id}/card`);
-    if (r.ok) $('#msgs').innerHTML += `<div class="msg a"><b>商机作战卡</b><div class="card-doc">${esc(await r.text())}</div></div>`;
+    if (r.ok) {
+      CARD_MD[id] = await r.text();
+      $('#msgs').innerHTML += `<div class="msg a"><b>商机作战卡</b><div class="card-doc">${esc(CARD_MD[id])}</div>`
+        + `<button class="copybtn" onclick="copyCard(${id}, this)">复制作战卡</button></div>`;
+    }
   }
   $('#msgs').scrollTop = 0;
 }
 
 function ask(q) { $('#q').value = q; sendChat(); }
 
+// 回到全局模式：不选任何线索，对整个看板提问
+function chatHome() {
+  SEL = null; renderBoard();
+  $('#chat-sub').textContent = '全局模式：直接问整个看板';
+  $('#q').placeholder = '问整个看板，或点开一条线索问细节…';
+  $('#quick').innerHTML = [
+    '哪些线索值得今天就跟进？', '制氢设备相关的商机有哪些？', '海外线索情况怎么样？'
+  ].map(q => `<button onclick="ask('${q}')">${q}</button>`).join('');
+  $('#msgs').innerHTML = `<div class="msg a">${esc(
+    `全局模式：当前 ${LEADS.filter(l => l.status !== 'rejected').length} 条在研线索。`
+    + `直接提问，回答会引用 #线索ID，点击即可跳转；点开左侧卡片可追问单条线索的原文细节。`)}</div>`;
+}
+
+// 把回答里的 #123 变成可点击跳转——只认看板上真实存在的线索号，不给幻觉编号做链接
+function linkCites(text) {
+  return esc(text)
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')   // 模型爱输出 markdown 粗体，转成真粗体
+    .replace(/#(\d+)/g, (m, id) =>
+      LEADS.some(l => l.id === +id) ? `<span class="lk" onclick="selectLead(${id})">${m}</span>` : m);
+}
+
+async function copyCard(id, btn) {
+  const md = CARD_MD[id];
+  if (!md) return;
+  try { await navigator.clipboard.writeText(md); }
+  catch (e) {   // 非安全上下文的兜底
+    const ta = document.createElement('textarea');
+    ta.value = md; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+  btn.textContent = '已复制 ✓（可直接粘进微信/邮件）';
+  setTimeout(() => { btn.textContent = '复制作战卡'; }, 2500);
+}
+
 async function sendChat() {
   const q = $('#q').value.trim();
   if (!q) return;
-  if (!SEL) { $('#msgs').innerHTML += `<div class="msg e">请先在左侧选一条线索。</div>`; return; }
   $('#q').value = '';
   $('#msgs').innerHTML += `<div class="msg u">${esc(q)}</div>`;
   const wait = document.createElement('div');
-  wait.className = 'msg a'; wait.textContent = '查证中…';
+  wait.className = 'msg a';
+  wait.textContent = SEL ? '查证中…' : '正在通读整个看板…';
   $('#msgs').appendChild(wait); $('#msgs').scrollTop = 1e9;
   try {
+    const body = SEL ? { lead_id: SEL, question: q } : { question: q };
     const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lead_id: SEL, question: q }) });
+      body: JSON.stringify(body) });
     const d = await r.json();
-    if (r.ok) { wait.textContent = d.answer; }
+    if (r.ok) { wait.innerHTML = linkCites(d.answer); }
     else { wait.className = 'msg e'; wait.textContent = d.detail || ('HTTP ' + r.status); }
   } catch (e) { wait.className = 'msg e'; wait.textContent = '请求失败：' + e; }
   $('#msgs').scrollTop = 1e9;
@@ -722,6 +782,7 @@ async function load() {
       + `<div class="k num" style="color:var(--ink-soft)">${st.cards_orphan}</div>`
       + `<div class="lbl">归并后失效卡</div></div>` : '');
   renderBoard();
+  if (!SEL) chatHome();   // 打开页面即全局模式，不用先选线索才能说话
   renderSignals(sigs);
   loadSources();
   loadRun();

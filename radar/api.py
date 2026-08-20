@@ -574,6 +574,59 @@ def collect_status():
 
 # ---------- 溯源问答：只回答"这条线索为什么出得来" ----------
 
+BOARD_CHAT_PROMPT = """你是氢能商机雷达的看板助手。销售没有选中具体线索，是对整个看板提问。
+
+你只能依据下面的漏斗统计与线索索引回答，**不得引入索引之外的任何信息**：
+- 引用具体线索时必须写成 #线索ID（如 #13），前端会把它变成可点击的跳转；
+- 涉及数量就直接给数字；涉及挑选就给出线索ID并说明依据（分数/区域/类型/行业）；
+- 索引里没有的信息（如公告原文细节、联系方式）不要猜，请回答"这需要点开具体线索查看原文"；
+- 回答控制在 200 字以内，中文，直接给结论，不要寒暄。
+
+【漏斗统计】
+{funnel}
+
+【在研线索索引】（每行：#ID｜采购方｜类型｜规模｜区域｜行业｜分数｜发布月｜有无作战卡）
+{listing}
+
+【销售的问题】
+{question}
+"""
+
+
+def _board_context(conn):
+    """给看板级对话构造上下文：漏斗数字 + 在研线索紧凑索引。
+
+    只放结构化字段，不放公告原文——原文属于线索级对话的语境；
+    索引最多 200 条（按分数排），超出部分如实告知条数，不静默截断。
+    """
+    n_signals = conn.execute("SELECT COUNT(*) FROM signals").fetchone()[0]
+    st = dict(conn.execute(
+        "SELECT status, COUNT(*) FROM leads GROUP BY status").fetchall())
+    n_cards = conn.execute(
+        "SELECT COUNT(*) FROM cards c JOIN leads l ON l.id=c.lead_id"
+        " AND l.status='new'").fetchone()[0]
+    funnel = (f"采集信号 {n_signals} 条 → 已研判 {sum(st.values())} 条"
+              f"（在研 {st.get('new', 0)}、判非商机 {st.get('rejected', 0)}、"
+              f"重复归并 {st.get('duplicate', 0)}）→ 作战卡 {n_cards} 张")
+
+    rows = conn.execute(
+        "SELECT l.id, l.company, l.signal_type, l.power_range, l.region,"
+        " l.industry, l.score, substr(s.published_at,1,7) AS pub,"
+        " (SELECT COUNT(*) FROM cards c WHERE c.lead_id=l.id) AS has_card"
+        " FROM leads l JOIN signals s ON s.id=l.signal_id"
+        " WHERE l.status='new' ORDER BY l.score DESC, l.id LIMIT 201").fetchall()
+    clipped = len(rows) > 200
+    rows = rows[:200]
+    listing = "\n".join(
+        f"#{r['id']}｜{r['company'] or '未提及'}｜{r['signal_type'] or '未知'}"
+        f"｜{r['power_range'] or '—'}｜{r['region'] or '—'}｜{r['industry'] or '未归类'}"
+        f"｜{r['score']}分｜{r['pub'] or '日期未载'}｜{'有卡' if r['has_card'] else '无卡'}"
+        for r in rows)
+    if clipped:
+        listing += "\n（仅列出分数最高的 200 条，其余低分线索未列出）"
+    return funnel, listing
+
+
 CHAT_PROMPT = """你是氢能商机雷达的溯源助手。销售在看一条线索，向你提问。
 
 你只能依据下面给出的线索档案与公告原文回答，**不得引入档案之外的任何信息**。
@@ -604,14 +657,36 @@ CHAT_PROMPT = """你是氢能商机雷达的溯源助手。销售在看一条线
 
 
 class ChatIn(BaseModel):
-    lead_id: int
+    lead_id: int | None = None   # 不传 = 对整个看板提问
     question: str
 
 
 @app.post("/api/chat")
 def chat(body: ChatIn):
-    """对话面板后端。通道不通时返回 503 并说明原因——不使用任何预置应答。"""
+    """对话面板后端。通道不通时返回 503 并说明原因——不使用任何预置应答。
+
+    两种模式：带 lead_id 是线索级溯源问答（原文进上下文）；
+    不带 lead_id 是看板级问答（漏斗统计 + 线索索引进上下文，回答须引用 #ID）。
+    """
     conn = connect()
+    if body.lead_id is None:
+        funnel, listing = _board_context(conn)
+        conn.close()
+        try:
+            from llm import ask, LLMUnavailable
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"LLM 模块不可用：{e}")
+        prompt = BOARD_CHAT_PROMPT.format(
+            funnel=funnel, listing=listing, question=body.question[:500])
+        try:
+            answer = ask(prompt, expect_json=False)
+        except LLMUnavailable as e:
+            raise HTTPException(status_code=503, detail=f"LLM 通道不可用：{e}")
+        except Exception as e:
+            raise HTTPException(status_code=500,
+                                detail=f"模型调用失败：{type(e).__name__}: {e}")
+        return {"lead_id": None, "answer": answer}
+
     row = conn.execute(
         "SELECT l.*, s.title AS signal_title, s.source, s.source_url, s.raw_text"
         " FROM leads l JOIN signals s ON s.id=l.signal_id WHERE l.id=?",

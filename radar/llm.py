@@ -51,6 +51,10 @@ CHANNEL_NAMES = {
 }
 DEFAULT_CHANNEL = "claude_cli"
 
+# 钉死模型：不钉的话，账号默认模型一变，打分口径和 JSON 行为会跟着悄悄变，
+# 提交前最后一次验收就可能不可复现。换模型必须是显式动作（改这里或设环境变量）。
+CLAUDE_MODEL = os.environ.get("RADAR_LLM_CLAUDE_MODEL", "claude-opus-5")
+
 CLAUDE_BIN = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
 CODEX_BIN = shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
 TIMEOUT = 180
@@ -129,6 +133,7 @@ def _run_cli(argv, prompt, timeout=TIMEOUT):
 
 def _claude_argv():
     return [CLAUDE_BIN, "-p",
+            "--model", CLAUDE_MODEL,
             "--disallowedTools", " ".join(DENY_TOOLS),
             "--strict-mcp-config",
             "--append-system-prompt", GUARD_PROMPT]
@@ -419,7 +424,9 @@ def scan_channels():
             exists = os.path.exists(binp)
             item.update(installed=exists, configured=exists,
                         path=binp if exists else "",
-                        detail=f"已安装：{binp}。登录状态未验证——点「测试并启用」才知道通不通"
+                        detail=(f"已安装：{binp}"
+                                + (f"，模型钉死为 {CLAUDE_MODEL}" if ch == "claude_cli" else "")
+                                + "。登录状态未验证——点「测试并启用」才知道通不通")
                                if exists
                                else f"未安装（未找到 {binp}）")
         sk = _safety_key(ch)
