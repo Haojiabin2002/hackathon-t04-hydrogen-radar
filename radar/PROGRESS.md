@@ -325,3 +325,21 @@ action 走服务端白名单（collect / open_lead / filter_board / remember 四
 实跑三个技能均正常。其中「风险预警」在 lead#13 上当场指出：线索档案里"中原油田位于
 河南濮阳""与陕西延长石油形成叠加窗口"在公告原文无对应表述，属依据不足的推断——
 溯源理念自己长出的自查能力。
+
+
+## 2026-08-21 · React 界面接入 FastAPI（v0.4.0）
+
+- 新版 React + TypeScript 界面保留在 `frontend/`，全部数据与操作继续调用既有
+  `/api/*`，不复制后端业务逻辑、不引入模拟数据。
+- Vite 生产构建输出到 `radar/web/react/`；FastAPI 同域托管构建产物，根路径与
+  `/opportunities/:id` 等前端深层路由均可直接刷新。旧版 `radar/web/index.html`
+  保留为构建缺失时的回退，没有被覆盖。
+- 本地开发默认代理到 `127.0.0.1:8000`，可用 `VITE_DEV_API_TARGET` 覆盖端口。
+- 写操作继续要求 `X-Radar-Local: 1`；来源校验补充允许生产环境同域 Host，跨站来源
+  与缺少自定义头的请求仍返回 403。
+
+针对性验证：`npm --prefix frontend run build` 通过；FastAPI 根页、深层页面、JS/CSS
+资源、`/api/stats` 均返回 200；未知 `/api/*` 返回 JSON 404；同源/跨站守卫用例通过。
+
+仓库全量 `radar_accept.sh` 在当前本机数据库停于 `leads(含评分理由)=0`（要求 ≥8）；
+本次改动没有触碰数据管线或数据库，也没有为追求绿灯伪造线索。

@@ -8,10 +8,12 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import yaml
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from db import connect
@@ -21,8 +23,14 @@ VERSION = "0.4.0"
 
 app = FastAPI(title="氢能商机雷达 API", version=VERSION)
 WEB = Path(__file__).parent / "web"
+REACT_WEB = WEB / "react"
 ROOT = Path(__file__).parent
 SOURCES_PATH = ROOT / "sources.yaml"
+
+# React 生产构建输出到 radar/web/react。assets 使用独立静态路由，页面路由
+# 则在文件末尾统一回退到 React 的 index.html，支持浏览器直接打开深层链接。
+if (REACT_WEB / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=REACT_WEB / "assets"), name="react-assets")
 
 
 def rows_to_dicts(rows):
@@ -1115,7 +1123,15 @@ def _guard_local(request: Request):
         raise HTTPException(status_code=403,
                             detail="缺少本地请求标记（防跨站伪造）。请从看板界面操作。")
     origin = request.headers.get("origin")
-    if origin and not re.match(r"^https?://(127\.0\.0\.1|localhost)(:\d+)?$", origin):
+    if not origin:
+        return
+
+    # 开发环境允许 Vite 的 localhost 端口；部署后允许与当前请求 Host 完全
+    # 相同的来源。自定义头仍会迫使真正的跨站请求先通过 CORS 预检。
+    origin_host = urlsplit(origin).netloc.lower()
+    request_host = request.headers.get("host", "").lower()
+    is_local_dev = bool(re.match(r"^(127\.0\.0\.1|localhost)(:\d+)?$", origin_host))
+    if not is_local_dev and origin_host != request_host:
         raise HTTPException(status_code=403, detail=f"拒绝跨站来源 {origin}")
 
 
@@ -1208,4 +1224,17 @@ def llm_health():
 
 @app.get("/")
 def index():
-    return FileResponse(WEB / "index.html")
+    entry = REACT_WEB / "index.html"
+    return FileResponse(entry if entry.is_file() else WEB / "index.html")
+
+
+@app.get("/{path:path}")
+def react_spa(path: str):
+    """托管 React 页面并支持前端路由刷新；未知 API 仍返回标准 404。"""
+    if path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API 路由不存在")
+
+    entry = REACT_WEB / "index.html"
+    if entry.is_file():
+        return FileResponse(entry)
+    raise HTTPException(status_code=404, detail="前端构建不存在，请先执行 npm --prefix frontend run build")
