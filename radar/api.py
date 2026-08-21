@@ -3,6 +3,7 @@ import datetime as dt
 import json
 import os
 import re
+import secrets
 import signal
 import subprocess
 import sys
@@ -12,7 +13,7 @@ from urllib.parse import urlsplit
 
 import yaml
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -33,8 +34,49 @@ if (REACT_WEB / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=REACT_WEB / "assets"), name="react-assets")
 
 
+@app.middleware("http")
+async def protect_public_mutations(request: Request, call_next):
+    """公网部署可选管理员口令；读取公开，所有 API 写操作统一保护。
+
+    本地不配置 RADAR_ADMIN_TOKEN 时保持原开发行为。生产环境配置后，调用方需
+    发送 X-Radar-Admin-Token 或 Bearer Token，防止公开看板被任意改源、改知识库
+    或消耗模型额度。
+    """
+    expected = os.getenv("RADAR_ADMIN_TOKEN", "").strip()
+    is_mutation = (
+        request.url.path.startswith("/api/")
+        and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}
+    )
+    if expected and is_mutation:
+        authorization = request.headers.get("authorization", "")
+        bearer = authorization[7:] if authorization.lower().startswith("bearer ") else ""
+        supplied = request.headers.get("x-radar-admin-token", "") or bearer
+        if not supplied or not secrets.compare_digest(supplied, expected):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "该操作需要管理员口令"},
+                headers={"Cache-Control": "no-store"},
+            )
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
+
+
 def rows_to_dicts(rows):
     return [dict(r) for r in rows]
+
+
+@app.get("/healthz", include_in_schema=False)
+def healthz():
+    """部署平台健康检查：验证进程与 SQLite 均可用，不暴露业务数据。"""
+    conn = connect()
+    try:
+        conn.execute("SELECT 1").fetchone()
+    finally:
+        conn.close()
+    return {"ok": True, "version": VERSION}
 
 
 # 省级行政区名——模型最容易由项目名"补"出来的一类地名

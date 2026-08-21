@@ -54,6 +54,7 @@ export class ApiError extends Error {
 }
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
+const adminTokenKey = 'hydrogen-radar-admin-token';
 
 function resolveUrl(path: string): string {
   if (!path.startsWith('/')) {
@@ -75,18 +76,46 @@ async function parseBody(response: Response): Promise<unknown> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(resolveUrl(path), {
+  const mutation = Boolean(init?.method && !['GET', 'HEAD', 'OPTIONS'].includes(init.method.toUpperCase()));
+
+  function savedAdminToken(): string {
+    if (!mutation || typeof window === 'undefined') return '';
+    try {
+      return window.sessionStorage.getItem(adminTokenKey)?.trim() ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  async function perform(adminToken = savedAdminToken()): Promise<Response> {
+    return fetch(resolveUrl(path), {
       ...init,
       headers: {
         Accept: 'application/json, text/plain;q=0.9',
+        ...(adminToken ? { 'X-Radar-Admin-Token': adminToken } : {}),
         ...init?.headers,
       },
     });
+  }
+
+  let response: Response;
+  try {
+    response = await perform();
   } catch (error) {
     const message = error instanceof Error ? error.message : '网络连接失败';
     throw new ApiError(0, `无法连接雷达服务：${message}`, error);
+  }
+
+  if (response.status === 401 && mutation && typeof window !== 'undefined') {
+    const token = window.prompt('该操作需要管理员口令。口令只保存在当前浏览器会话中。')?.trim();
+    if (token) {
+      try {
+        window.sessionStorage.setItem(adminTokenKey, token);
+      } catch {
+        // 浏览器禁用会话存储时仍可完成当前一次请求。
+      }
+      response = await perform(token);
+    }
   }
 
   const payload = await parseBody(response);
