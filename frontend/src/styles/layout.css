@@ -318,7 +318,7 @@ button.sidebar-link {
   z-index: 55;
   display: none;
   padding: 0;
-  background: rgba(2, 5, 32, .42);
+  background: var(--scrim);
   border: 0;
   cursor: pointer;
 }
