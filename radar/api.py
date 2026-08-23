@@ -13,7 +13,8 @@ from urllib.parse import urlsplit
 
 import yaml
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import (FileResponse, JSONResponse, PlainTextResponse,
+                               StreamingResponse)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -1115,6 +1116,55 @@ def run_agent(body: AgentIn, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+
+
+@app.post("/api/agent/stream")
+def run_agent_stream(body: AgentIn, request: Request):
+    """Agent 循环的流式版本（SSE）。
+
+    一次 agent 调用要跑 1-3 分钟。非流式接口会让用户对着空白等两分钟，
+    既不知道它在干什么，也不知道是不是卡死了。所以把 agent.run 的 on_step
+    回调桥接成 SSE：每完成一步就推一条，前端可以实时画出执行轨迹。
+
+    事件：
+      event: step   每一步（含 thought / tool / args / ok / result_preview）
+      event: done   收敛（含 answer / action / trace / steps）
+      event: error  失败（含 detail）
+    """
+    _guard_local(request)
+    goal = (body.goal or "").strip()
+    if not goal:
+        raise HTTPException(status_code=400, detail="goal 不能为空")
+
+    import queue
+    import threading
+
+    steps = max(1, min(int(body.max_steps or 8), 12))
+    q: "queue.Queue[tuple[str, object]]" = queue.Queue()
+
+    def worker():
+        try:
+            import agent as ag
+            out = ag.run(goal, max_steps=steps, on_step=lambda e: q.put(("step", e)))
+            q.put(("done", out))
+        except Exception as e:            # 包含 LLMUnavailable
+            q.put(("error", {"detail": f"{type(e).__name__}: {e}"}))
+        finally:
+            q.put(("__end__", None))
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    def events():
+        while True:
+            kind, payload = q.get()
+            if kind == "__end__":
+                return
+            yield f"event: {kind}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-store",
+        "X-Accel-Buffering": "no",     # 反代下禁缓冲，否则 SSE 会被攒着一次性吐出
+    })
 
 
 @app.get("/api/agent/tools")

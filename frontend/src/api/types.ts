@@ -340,3 +340,74 @@ export interface LlmHealthResponse {
   ok: boolean;
   detail: string;
 }
+
+// ---------------------------------------------------------------- Agent
+
+/** Agent 执行轨迹里的一步。工具步与收敛步字段不同，用 done 区分。 */
+export interface AgentStep {
+  step: number;
+  thought?: string;
+  /** 收敛步没有 tool */
+  tool?: string;
+  args?: Record<string, unknown>;
+  ok?: boolean;
+  /** 工具成功时的结果预览（已被后端截断） */
+  result_preview?: string;
+  /** 工具失败或模型输出不合法时的原因 */
+  error?: string;
+  done?: boolean;
+  elapsed_s?: number;
+}
+
+export interface AgentResult {
+  answer: string;
+  action: ChatAction | null;
+  trace: AgentStep[];
+  steps: number;
+  /** 步数耗尽仍未收敛。此时 answer 是如实说明，不是结论。 */
+  exhausted?: boolean;
+}
+
+export interface AgentInput {
+  goal: string;
+  max_steps?: number;
+}
+
+export interface AgentToolSpec {
+  name: string;
+  description: string;
+  args: Record<string, string>;
+  /** true 表示 agent 不能自己执行，只能提议，要人确认 */
+  requires_confirm: boolean;
+}
+
+export interface AgentToolsResponse {
+  tools: AgentToolSpec[];
+}
+
+// ---------------------------------------------------------------- 偏好
+
+export interface Preferences {
+  focus_regions: string[];
+  focus_products: string[];
+  min_score: number;
+  exclude_regions: string[];
+  tone: string;
+}
+
+export type PreferenceKey = keyof Preferences;
+
+export interface PreferencesResponse {
+  preferences: Preferences;
+  /** 键 → 人类可读说明，由后端 PREF_SCHEMA 提供 */
+  schema: Record<string, string>;
+}
+
+export interface PreferenceInput {
+  key: PreferenceKey;
+  value: string | number | string[];
+}
+
+export interface PreferenceSaveResult {
+  saved: Record<string, unknown>;
+}

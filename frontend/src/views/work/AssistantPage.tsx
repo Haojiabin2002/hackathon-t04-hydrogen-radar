@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Bot, CheckCircle2, ExternalLink, RefreshCw, Send, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle2, ExternalLink, MessageSquare, RefreshCw, Send, Sparkles, X } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiGet, apiMutation } from '../../api/client';
 import type { ChatAction, ChatInput, ChatResponse, CollectStartResult, Lead, MemoryCreateInput } from '../../api/types';
 import { ArtPageHead } from '../../components/cards/ArtPageHead';
 import { useRouteMeta } from '../../hooks/useRouteMeta';
+import { CitedAnswer } from './CitedAnswer';
+import { AgentPanel } from './AgentPanel';
+import { AgentSidebar } from './AgentSidebar';
 
 type Message = {
   id: string;
@@ -28,21 +31,6 @@ function actionLabel(action: ChatAction) {
   return '确认保存这条销售偏好';
 }
 
-function CitedAnswer({ text, leads }: { text: string; leads: Lead[] }) {
-  const known = useMemo(() => new Set(leads.map((lead) => lead.id)), [leads]);
-  return (
-    <>
-      {text.split(/(#\d+)/g).map((part, index): ReactNode => {
-        const matched = part.match(/^#(\d+)$/);
-        const id = matched ? Number(matched[1]) : null;
-        return id && known.has(id)
-          ? <Link className="btn-link" to={`/opportunities/${id}`} key={`${part}-${index}`}>{part}</Link>
-          : part;
-      })}
-    </>
-  );
-}
-
 export default function AssistantPage() {
   const meta = useRouteMeta();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -51,6 +39,13 @@ export default function AssistantPage() {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [actionStatus, setActionStatus] = useState<{ messageId: string; message: string; error?: boolean } | null>(null);
+  const mode = searchParams.get('mode') === 'agent' ? 'agent' : 'chat';
+  const setMode = (next: 'chat' | 'agent') => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'agent') params.set('mode', 'agent');
+    else params.delete('mode');
+    setSearchParams(params, { replace: true });
+  };
   const rawLeadId = searchParams.get('lead');
   const leadId = rawLeadId && /^\d+$/.test(rawLeadId) ? Number(rawLeadId) : null;
   const leads = useQuery({ queryKey: ['leads'], queryFn: () => apiGet<Lead[]>('/api/leads') });
@@ -135,10 +130,33 @@ export default function AssistantPage() {
         <div className="chat-layout">
           <section className="panel chat-panel">
             <div className="panel-head">
-              <div><h2>{activeLead ? `商机 #${activeLead.id} 溯源对话` : '全局看板对话'}</h2><p>{activeLead ? activeLead.company || activeLead.signal_title : '回答可引用当前真实商机编号'}</p></div>
-              {activeLead && <button className="icon-btn" aria-label="退出商机上下文" onClick={() => setSearchParams({}, { replace: true })}><X size={17} /></button>}
+              <div>
+                <h2>{mode === 'agent' ? 'Agent 模式' : activeLead ? `商机 #${activeLead.id} 溯源对话` : '全局看板对话'}</h2>
+                <p>{mode === 'agent'
+                  ? '给一个目标，它自己决定调哪些工具、何时收敛'
+                  : activeLead ? activeLead.company || activeLead.signal_title : '回答可引用当前真实商机编号'}</p>
+              </div>
+              <div className="flex-c" style={{ gap: 8 }}>
+                <div className="assistant-mode" role="group" aria-label="助手模式">
+                  <button type="button" className={mode === 'chat' ? 'is-active' : ''}
+                          aria-pressed={mode === 'chat'} onClick={() => setMode('chat')}>
+                    <MessageSquare size={13} aria-hidden="true" />问答
+                  </button>
+                  <button type="button" className={mode === 'agent' ? 'is-active' : ''}
+                          aria-pressed={mode === 'agent'} onClick={() => setMode('agent')}>
+                    <Bot size={13} aria-hidden="true" />Agent
+                  </button>
+                </div>
+                {mode === 'chat' && activeLead && (
+                  <button className="icon-btn" aria-label="退出商机上下文"
+                          onClick={() => setSearchParams({}, { replace: true })}><X size={17} /></button>
+                )}
+              </div>
             </div>
 
+            {mode === 'agent'
+              ? <AgentPanel leads={leads.data ?? []} />
+              : (<>
             <div className="message-list" aria-live="polite">
               {messages.length === 0 && !chat.isPending && (
                 <div className="empty-state">
@@ -177,9 +195,12 @@ export default function AssistantPage() {
               />
               <button className="btn btn-primary" type="submit" disabled={!question.trim() || chat.isPending || invalidContext}><Send size={15} />发送</button>
             </form>
+              </>)}
           </section>
 
           <aside className="stack">
+            {mode === 'agent' && <AgentSidebar />}
+            {mode === 'chat' && <>
             <section className="panel">
               <div className="panel-head"><div><h2>对话上下文</h2><p>通过 URL 保留，可直接分享</p></div></div>
               <div className="panel-body">
@@ -213,6 +234,7 @@ export default function AssistantPage() {
                 {quickQuestions.map((prompt) => <button className="filter-chip" key={prompt} onClick={() => setQuestion(prompt)}>{prompt}</button>)}
               </div>
             </section>
+            </>}
           </aside>
         </div>
       )}

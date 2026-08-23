@@ -1156,3 +1156,279 @@
   .art-inline-search { width: 100%; }
   .art-table-header-left { width: 100%; }
 }
+
+/* ============================================================== Agent 执行轨迹 */
+/* 一个不能复盘的 agent 不可信。每一步的想法、工具、参数、返回都要看得见。
+ * 全部走角色层令牌，暗色下自动跟随。 */
+
+.art-trace {
+  margin: 12px 0;
+  overflow: hidden;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-base);
+}
+
+.art-trace-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.art-trace-header strong { font-size: 13px; font-weight: 620; }
+
+.art-trace-header span {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.art-trace-collapse {
+  padding: 0;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.art-trace-list { padding: 6px 14px 12px; }
+
+.art-trace-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 0 4px;
+}
+
+/* 竖线把步骤串成一条链，最后一步不画 */
+.art-trace-step::before {
+  content: '';
+  position: absolute;
+  top: 32px;
+  bottom: -4px;
+  left: 10px;
+  width: 1px;
+  background: var(--line);
+}
+
+.art-trace-step:last-child::before { display: none; }
+
+.art-trace-marker {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+
+.art-trace-step.is-ok .art-trace-marker { color: var(--brand); border-color: var(--brand-line); }
+.art-trace-step.is-done .art-trace-marker { color: var(--success); background: var(--success-soft); border-color: transparent; }
+.art-trace-step.is-failed .art-trace-marker { color: var(--danger); background: var(--danger-soft); border-color: transparent; }
+.art-trace-step.is-running .art-trace-marker { color: var(--brand); border-color: var(--brand-line); }
+
+.art-trace-body { min-width: 0; }
+
+.art-trace-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.art-trace-head b { font-size: 13px; font-weight: 620; }
+.art-trace-head time { flex-shrink: 0; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.art-trace-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  color: var(--danger);
+  font-size: 10.5px;
+  font-weight: 600;
+  background: var(--danger-soft);
+  border-radius: var(--radius-pill);
+}
+
+.art-trace-thought {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.art-trace-args {
+  display: block;
+  margin-top: 5px;
+  padding: 5px 8px;
+  overflow-x: auto;
+  color: var(--ink-2);
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 11.5px;
+  background: var(--surface);
+  border-radius: var(--radius-xs);
+}
+
+.art-trace-error {
+  margin-top: 5px;
+  padding: 6px 9px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.55;
+  background: var(--danger-soft);
+  border-radius: var(--radius-xs);
+}
+
+.art-trace-toggle {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  margin-top: 6px;
+  padding: 0;
+  color: var(--brand);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.art-trace-toggle svg { transition: transform var(--dur-fast) var(--ease); }
+.art-trace-toggle.is-open svg { transform: rotate(180deg); }
+
+.art-trace-preview {
+  max-height: 190px;
+  margin-top: 6px;
+  padding: 9px 11px;
+  overflow: auto;
+  color: var(--ink-2);
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  border-radius: var(--radius-xs);
+}
+
+.art-trace-spin { animation: spin 1s linear infinite; }
+
+/* ---------------------------------------------------------- 助手模式切换 */
+.assistant-mode {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-pill);
+}
+
+.assistant-mode button {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.assistant-mode button.is-active {
+  color: var(--brand);
+  font-weight: 600;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+/* Agent 目标输入比单句提问长，给它更大的输入区 */
+.composer.is-agent { grid-template-columns: 1fr auto; align-items: end; }
+.composer.is-agent textarea {
+  min-height: 62px;
+  max-height: 160px;
+  padding: 10px 13px;
+  font-size: 14px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.agent-hint {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0 14px 10px;
+  padding: 9px 11px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-inner);
+}
+
+.agent-hint svg { flex: 0 0 auto; margin-top: 2px; color: var(--brand); }
+
+/* ---------------------------------------------------------------- 偏好页 */
+.pref-list { display: grid; gap: 14px; }
+
+.pref-row {
+  display: grid;
+  grid-template-columns: minmax(0, 210px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.pref-row:last-child { border-bottom: 0; }
+.pref-row > div:first-child > strong { font-size: 13.5px; font-weight: 620; }
+.pref-row > div:first-child > small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+.pref-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+.pref-tag {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  height: 26px;
+  padding: 0 5px 0 10px;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--brand-soft);
+  border-radius: var(--radius-pill);
+}
+
+.pref-tag button {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.pref-tag button:hover { background: var(--surface); }
+
+@media (max-width: 760px) {
+  .pref-row { grid-template-columns: 1fr; gap: 8px; }
+}
+
+/* 需确认的工具被拦下：是确认闸不是失败，用琥珀而非红 */
+.art-trace-step.is-gated .art-trace-marker { color: var(--risk); background: var(--risk-soft); border-color: transparent; }
+.art-trace-tag.is-gated { color: var(--risk); background: var(--risk-soft); }
+.art-trace-error.is-gated { color: var(--risk); background: var(--risk-soft); }

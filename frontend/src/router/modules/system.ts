@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { AlarmClock, Brain, Settings2 } from 'lucide-react';
+import { AlarmClock, Brain, Settings2, SlidersHorizontal } from 'lucide-react';
 import type { RouteGroup } from '../types';
 
 export const systemGroup: RouteGroup = {
@@ -22,6 +22,15 @@ export const systemGroup: RouteGroup = {
         title: '销售记忆',
         icon: Brain,
         description: '记录稳定的关注偏好，例如重点区域、优先产品与不应推荐的情形。每轮销售对话都会读取这些真实配置。',
+      },
+    },
+    {
+      path: '/settings/preferences',
+      component: lazy(() => import('../../views/system/PreferencesPage')),
+      meta: {
+        title: '销售偏好',
+        icon: SlidersHorizontal,
+        description: '结构化偏好，每轮注入 Agent 上下文，直接影响它的检索条件',
       },
     },
     {

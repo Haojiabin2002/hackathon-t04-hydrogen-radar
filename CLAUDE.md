@@ -47,6 +47,10 @@ hackathon-t04/
     ├── skills/*.md                    【数据侧】技能文件：frontmatter 元数据 + 正文提示词
     ├── llm.py                         【数据侧】大模型调用通道
     │
+    ├── agent.py                       【数据侧】Agent 循环：模型自主决定调哪个工具、何时收敛
+    ├── tools.py                       【数据侧】工具注册表：白名单 + 参数校验 + 由我们的代码执行
+    ├── harness.py                     【数据侧】Harness 状态：记忆 / 偏好 / 知识索引 / 技能目录
+    │
     ├── api.py                         【呈现侧】FastAPI 接口 + 托管前端 + 版本号来源
     ├── backfill_published.py          【呈现侧】一次性修复脚本：回填公告发布时间
     ├── web/index.html                 【呈现侧】单文件兜底界面（React 构建缺失时回退）
@@ -137,7 +141,20 @@ frontend/src/
 通道不通就抛 `LLMUnavailable`，让上游任务失败并如实记录在 `BLOCKED.md`。
 "先用假数据让 demo 跑起来"是本项目最严重的违规。
 
-**4. 模型推断的值不许伪装成实证值**
+**4. Agent 的工具不许还给模型**
+
+`llm.py` 把 CLI 子进程的全部工具和 MCP 都禁掉了，并有隔离探针把关——
+公告正文是不可信数据、会原样进 prompt，带工具能力的子进程等于给 prompt injection 开门。
+
+所以 `tools.py` 里的「工具」**不是**还给模型的文件系统 / shell 能力，而是：
+模型只输出结构化调用 → 我们的代码按白名单校验 → 我们的代码执行 → 结果喂回循环。
+
+**新增工具时守住这条线**：只暴露本项目自己的数据，
+不要引入任何能执行外部命令、访问任意路径或发起任意网络请求的能力。
+会产生外部副作用的工具（如触发采集）必须标 `confirm=True`，
+由人确认后才执行，agent 不得自行发起。
+
+**5. 模型推断的值不许伪装成实证值**
 `api.py` 的 `trace_field()` 会逐片段核对每个字段能否在公告原文里找到。
 比如「河南濮阳（中原油田）」里只有"中原油田"命中、"河南濮阳"没有，
 整条就必须标成 `inferred`——因为这个地名正在参与区域打分。
@@ -152,7 +169,7 @@ frontend/src/
 | | 数据侧 | 呈现侧 |
 |---|---|---|
 | 负责人 | @Haojiabin2002 | @MristYun |
-| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.md`<br>`skills.py`<br>`skills/*.md`<br>`llm.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html`<br>`frontend/**`<br>`DESIGN.md` |
+| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.md`<br>`skills.py`<br>`skills/*.md`<br>`llm.py`<br>`agent.py`<br>`tools.py`<br>`harness.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html`<br>`frontend/**`<br>`DESIGN.md` |
 | 只读不改 | `db.py`、呈现侧的所有文件 | `db.py`、数据侧的所有文件 |
 | 交界面 | 往 `leads` 表**写** | 从 `leads` 表**读** |
 
