@@ -1,0 +1,102 @@
+sources:
+- key: 氢启未来
+  name: 氢启未来（h2weilai.com）
+  enabled: true
+  kind: web
+  quota: 40
+  base: https://www.h2weilai.com
+  lists:
+  - https://www.h2weilai.com/cms/index/lists/catid/28.html
+  - https://www.h2weilai.com/cms/index/lists/catid/29.html
+  - https://www.h2weilai.com/cms/index/lists/catid/38.html
+  - https://www.h2weilai.com/
+  paginate:
+    template: https://www.h2weilai.com/cms/index/lists/catid/28.html?page={p}
+    pages:
+    - 2
+    - 12
+  article_pattern: /shows/
+  body_selectors:
+  - div.conts
+  reason: '氢能垂直门户，「市场动态」栏目集中转载中石化、国家能源集团等央国企的 招投标公告原文，且带发布时间；实测无人机验证、正文可直取、分页规整（300+ 页）， 是国内招标类信号密度最高的可爬源。
+
+    '
+- key: 国际氢能网
+  name: 国际氢能网（h2.in-en.com）
+  enabled: true
+  kind: web
+  quota: 30
+  base: https://h2.in-en.com
+  lists:
+  - https://h2.in-en.com/
+  - https://h2.in-en.com/zhiqing/
+  - https://h2.in-en.com/rlqc/
+  article_pattern: /html/h2-\d+\.shtml
+  body_selectors:
+  - div.conTextBox
+  - div.content
+  reason: '与氢启未来互补：更新更快（当日即发），且覆盖绿色甲醇/绿氨/氢冶金等 2026 年试点新增场景——这些正是氢璞老客户地图上没有的新买家类型。 站点自带 WAF SDK 但未触发拦截，实测列表
+    151KB、详情 69KB 均为真实正文。
+
+    '
+- key: TED欧盟招标
+  name: TED 欧盟公共采购（api.ted.europa.eu）
+  enabled: true
+  kind: ted_api
+  overseas: true    # 海外源标记：看板的「海外」徽标与统计按这个字段算，不写死在代码里
+  quota: 20
+  queries:
+  - label: 氢+燃料电池
+    q: FT~("hydrogen") AND FT~("fuel cell")
+  - label: 氢+电解槽
+    q: FT~("hydrogen") AND FT~("electrolyser")
+  - label: 氢+加氢
+    q: FT~("hydrogen") AND FT~("refuelling")
+  per_query: 25
+  reason: '欧盟官方采购公告库，免密 API，响应自带采购方名称、国别与 官方采购联系邮箱（organisation-email-buyer）——海外线索的联系方式 因此有据可查而非编造。覆盖氢璞的海外机会（电解槽/电堆类标的）。
+
+    '
+- key: 金联创
+  name: 金联创氢能
+  enabled: false
+  kind: web
+  quota: 0
+  reason: '停用。正文页需通过滑块人机验证。项目死规矩：不绕过任何人机验证， 遇到即跳过并记录。若后续获得官方授权或数据接口可重新启用。
+
+    '
+- key: 北极星氢能
+  name: 北极星氢能网（qn.bjx.com.cn）
+  enabled: false
+  kind: web
+  quota: 0
+  reason: '停用。命中 WAF 安全验证拦截页（响应体过小且含验证标记）。 同上，不绕过。
+
+    '
+- key: 中国政府采购网
+  name: 中国政府采购网（ccgp.gov.cn）
+  enabled: false
+  kind: web
+  quota: 0
+  reason: '停用。实测直连返回 HTTP 403，需特定请求条件方可访问， 不做规避尝试。列为后续申请合规数据源的首选。
+
+    '
+- key: UNGM
+  name: 联合国全球采购（ungm.org）
+  enabled: false
+  kind: web
+  quota: 0
+  reason: '备选，本期未实现。实测站点可达（HTTP 200），公告检索需会话态， 待海外线路验证充分后再评估。
+
+    '
+- key: 碳索氢能网
+  name: 碳索氢能网（h2.solarbe.com）
+  enabled: true
+  kind: web
+  quota: 15
+  base: https://h2.solarbe.com
+  lists:
+  - https://h2.solarbe.com/
+  article_pattern: /news/
+  body_selectors:
+  - article
+  reason: 氢能垂直媒体，首页即公告流，实测53条氢能相关文章链接、正文容器可直取；更新快，与氢启未来、国际氢能网互为补充，可提高招标类信号的召回。

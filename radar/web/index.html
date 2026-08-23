@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>氢能商机雷达 · 氢璞创能</title>
+<title>氢能商机雷达 · 数字员工</title>
 <style>
   :root {
     --bg: #f2f5f7; --surface: #ffffff; --surface-2: #e8eef1;
@@ -11,6 +11,8 @@
     --accent: #0f6e8c; --accent-soft: #e3eff4; --accent-ink: #0b556c;
     --hi: #9a6a15; --hi-bg: #f5ead4; --ok: #2c7a4b; --ok-bg: #e2f0e8;
     --warn: #a03c2e; --warn-bg: #f6e4e0; --p1: #8a63b8; --p1-bg: #efe9f7;
+    --infer-bg:#fdf0d8; --infer-ink:#8a5d10; --infer-line:#e8c98a;
+    --okt-bg:#e3f3e8; --okt-ink:#1f6b3d; --stale-bg:#f0ecec; --stale-ink:#7a6a6a;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -19,6 +21,8 @@
       --accent: #4fb3d1; --accent-soft: #16303c; --accent-ink: #7ecbe2;
       --hi: #d8a94f; --hi-bg: #322d1c; --ok: #6fbf8f; --ok-bg: #1c3227;
       --warn: #e08573; --warn-bg: #3a2420; --p1: #b195d8; --p1-bg: #2a2138;
+      --infer-bg:#3a2f18; --infer-ink:#e2b761; --infer-line:#6b5424;
+      --okt-bg:#1d3527; --okt-ink:#78c795; --stale-bg:#2f2b2b; --stale-ink:#a89a9a;
     }
   }
   :root[data-theme="dark"] {
@@ -27,6 +31,8 @@
     --accent: #4fb3d1; --accent-soft: #16303c; --accent-ink: #7ecbe2;
     --hi: #d8a94f; --hi-bg: #322d1c; --ok: #6fbf8f; --ok-bg: #1c3227;
     --warn: #e08573; --warn-bg: #3a2420; --p1: #b195d8; --p1-bg: #2a2138;
+    --infer-bg:#3a2f18; --infer-ink:#e2b761; --infer-line:#6b5424;
+    --okt-bg:#1d3527; --okt-ink:#78c795; --stale-bg:#2f2b2b; --stale-ink:#a89a9a;
   }
   * { box-sizing: border-box; }
   body {
@@ -36,20 +42,27 @@
   }
   .topbar {
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    padding: 14px 22px; background: var(--surface); border-bottom: 1px solid var(--line);
-    position: sticky; top: 0; z-index: 10;
+    padding: 12px 22px; background: var(--surface); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 20;
   }
   .logo { font-weight: 700; font-size: 17px; color: var(--accent-ink); }
   .logo small { color: var(--ink-soft); font-weight: 400; font-size: 12.5px; margin-left: 8px; }
-  .ver {
-    margin-left: 10px; padding: 2px 7px; border-radius: 4px; vertical-align: 2px;
+  .ver { margin-left: 10px; padding: 2px 7px; border-radius: 4px; vertical-align: 2px;
     background: var(--accent-soft); color: var(--accent-ink);
-    font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums;
-  }
-  .stats { display: flex; gap: 16px; margin-left: auto; flex-wrap: wrap; }
+    font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stats { display: flex; gap: 15px; flex-wrap: wrap; }
   .stat { text-align: right; }
-  .stat .k { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .stat .k { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
   .stat .lbl { font-size: 11.5px; color: var(--ink-soft); }
+  .runbox { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .runinfo { font-size: 11.5px; color: var(--ink-soft); text-align: right; line-height: 1.45; }
+  button.act {
+    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    padding: 8px 15px; border-radius: 7px; cursor: pointer; font-size: 13.5px;
+    font-family: inherit; font-weight: 600; white-space: nowrap;
+  }
+  button.act:hover { filter: brightness(1.08); }
+  button.act:disabled { opacity: .5; cursor: not-allowed; }
   .tabs { display: flex; gap: 4px; padding: 12px 22px 0; flex-wrap: wrap; }
   .tabs button {
     border: 1px solid var(--line); border-bottom: none; background: var(--surface-2);
@@ -58,128 +71,380 @@
   }
   .tabs button.on { background: var(--surface); color: var(--accent-ink); font-weight: 650; }
   .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .wrap { padding: 0 22px 40px; }
-  .screen { display: none; background: var(--surface); border: 1px solid var(--line); border-radius: 0 8px 8px 8px; padding: 20px; }
+  .wrap { padding: 0 22px 30px; }
+  .screen { display: none; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 0 8px 8px 8px; padding: 18px; }
   .screen.on { display: block; }
-  .banner {
-    background: var(--hi-bg); color: var(--hi); border-radius: 6px;
-    padding: 10px 14px; font-size: 13.5px; margin-bottom: 16px;
+  .banner { background: var(--hi-bg); color: var(--hi); border-radius: 6px;
+    padding: 9px 13px; font-size: 13px; margin-bottom: 14px; }
+
+  /* ---- 主区：对话式看板 + 右侧对话面板 ---- */
+  .workspace { display: grid; grid-template-columns: minmax(0,1fr) 372px; gap: 16px; align-items: start; }
+  @media (max-width: 1080px) { .workspace { grid-template-columns: 1fr; } }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .filters button {
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
+    padding: 5px 12px; border-radius: 999px; cursor: pointer; font-size: 12.5px; font-family: inherit;
   }
-  table { border-collapse: collapse; width: 100%; font-size: 14px; }
-  .tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
-  th { text-align: left; background: var(--surface-2); padding: 9px 12px; font-weight: 650; white-space: nowrap; border-bottom: 1px solid var(--line); }
-  td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  tr:last-child td { border-bottom: none; }
-  tr.clickable { cursor: pointer; }
-  tr.clickable:hover { background: var(--accent-soft); }
-  .num { font-variant-numeric: tabular-nums; }
-  .score-pill {
-    display: inline-block; min-width: 38px; text-align: center; padding: 1px 8px;
-    border-radius: 999px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px;
-  }
+  .filters button.on { background: var(--accent-soft); color: var(--accent-ink);
+    border-color: var(--accent); font-weight: 650; }
+  .cardflow { display: flex; flex-direction: column; gap: 11px; max-height: 74vh; overflow: auto; padding-right: 4px; }
+
+  .lcard { border: 1px solid var(--line); border-radius: 9px; padding: 13px 15px;
+    background: var(--surface); cursor: pointer; transition: border-color .12s; }
+  .lcard:hover { border-color: var(--accent); }
+  .lcard.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .lcard .hd { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 8px; }
+  .lcard .co { font-weight: 650; font-size: 14.5px; flex: 1; min-width: 0; }
+  .grid6 { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12.8px; }
+  .grid6 dt { color: var(--ink-soft); white-space: nowrap; }
+  .grid6 dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .lcard .ft { margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--line);
+    font-size: 12.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .score-pill { display: inline-block; min-width: 38px; text-align: center; padding: 1px 8px;
+    border-radius: 999px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; }
   .s-hi { background: var(--ok-bg); color: var(--ok); }
   .s-mid { background: var(--hi-bg); color: var(--hi); }
   .s-lo { background: var(--surface-2); color: var(--ink-soft); }
   .s-rej { background: var(--warn-bg); color: var(--warn); }
-  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 4px; background: var(--accent-soft); color: var(--accent-ink); }
-  .tag.infer { background: #fdf0d8; color: #8a5d10; border: 1px solid #e8c98a; cursor: help; }
-  .tag.ok { background: #e3f3e8; color: #1f6b3d; cursor: help; }
-  .tag.stale { background: #f0ecec; color: #7a6a6a; margin-left: 6px; }
-  .corrob { font-size: 13px; line-height: 1.7; }
-  @media (prefers-color-scheme: dark) {
-    .tag.infer { background: #3a2f18; color: #e2b761; border-color: #6b5424; }
-    .tag.ok { background: #1d3527; color: #78c795; }
-    .tag.stale { background: #2f2b2b; color: #a89a9a; }
-  }
+  .tag { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 4px;
+    background: var(--accent-soft); color: var(--accent-ink); }
+  .tag.infer { background: var(--infer-bg); color: var(--infer-ink); border: 1px solid var(--infer-line); cursor: help; }
+  .tag.ok { background: var(--okt-bg); color: var(--okt-ink); cursor: help; }
+  .tag.stale { background: var(--stale-bg); color: var(--stale-ink); }
+  .tag.sea { background: var(--p1-bg); color: var(--p1); }
+  .tag.cls { background: var(--p1-bg); color: var(--p1); cursor: help; }
+  .tag.none { background: transparent; color: var(--ink-soft); border: 1px dashed var(--line); }
+
+  /* ---- 对话面板 ---- */
+  .chat { border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2);
+    display: flex; flex-direction: column; height: 74vh; position: sticky; top: 78px; }
+  .chat h3 { margin: 0; padding: 11px 14px; font-size: 14px; color: var(--accent-ink);
+    border-bottom: 1px solid var(--line); }
+  .chat h3 small { display:block; color: var(--ink-soft); font-weight: 400; font-size: 11.5px; }
+  .msgs { flex: 1; overflow: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { font-size: 13px; border-radius: 8px; padding: 9px 11px; max-width: 92%; white-space: pre-wrap; }
+  .msg.u { background: var(--accent); color: #fff; align-self: flex-end; }
+  .msg.a { background: var(--surface); border: 1px solid var(--line); align-self: flex-start; }
+  .msg.e { background: var(--warn-bg); color: var(--warn); align-self: flex-start; }
+  .quick { display: flex; gap: 5px; flex-wrap: wrap; padding: 0 14px 9px; }
+  .msg .lk { color: var(--accent-ink); text-decoration: underline; cursor: pointer; font-weight: 600; }
+  .copybtn { display: block; margin-top: 7px; border: 1px solid var(--line); background: var(--surface);
+             color: var(--ink-soft); border-radius: 6px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
+  .copybtn:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .quick button { border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
+    font-size: 11.5px; padding: 4px 9px; border-radius: 999px; cursor: pointer; font-family: inherit; }
+  .quick button:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .composer { display: flex; gap: 7px; padding: 10px 12px; border-top: 1px solid var(--line); }
+  .composer input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 7px;
+    padding: 8px 10px; font-size: 13px; font-family: inherit; background: var(--surface); color: var(--ink); }
+  .composer button { border: none; background: var(--accent); color: #fff; border-radius: 7px;
+    padding: 8px 13px; cursor: pointer; font-size: 13px; font-family: inherit; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+  th { text-align: left; background: var(--surface-2); padding: 9px 12px; font-weight: 650;
+    white-space: nowrap; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .num { font-variant-numeric: tabular-nums; }
   .muted { color: var(--ink-soft); font-size: 13px; }
-  .cols { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; }
-  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
-  .panel { border: 1px solid var(--line); border-radius: 7px; padding: 16px; background: var(--surface); }
-  .panel h3 { margin: 0 0 10px; font-size: 15px; color: var(--accent-ink); }
-  .kv { display: grid; grid-template-columns: 88px 1fr; gap: 6px 12px; font-size: 13.5px; }
-  .kv dt { color: var(--ink-soft); }
-  .kv dd { margin: 0; }
-  .card-doc { white-space: pre-wrap; font-size: 13.5px; background: var(--surface-2); border-radius: 6px; padding: 14px; max-height: 460px; overflow: auto; }
-  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  @media (max-width: 900px) { .board { grid-template-columns: repeat(2, 1fr); } }
-  .colm { background: var(--surface-2); border-radius: 7px; padding: 10px; min-height: 200px; }
-  .colm h4 { margin: 0 0 8px; font-size: 13px; color: var(--ink-soft); }
-  .lead { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; margin-bottom: 8px; font-size: 13px; cursor: pointer; }
-  .lead:hover { border-color: var(--accent); }
-  .lead .t { font-weight: 650; display: block; margin-bottom: 3px; }
+  .card-doc { white-space: pre-wrap; font-size: 13px; background: var(--surface-2);
+    border-radius: 6px; padding: 13px; max-height: 300px; overflow: auto; margin-top: 10px; }
+  .srcrow { display: flex; gap: 12px; align-items: flex-start; padding: 13px;
+    border: 1px solid var(--line); border-radius: 8px; margin-bottom: 9px; }
+  .srcrow.off { opacity: .62; }
+  .sw { position: relative; width: 42px; height: 23px; flex: none; margin-top: 2px; }
+  .sw input { opacity: 0; width: 0; height: 0; }
+  .sw span { position: absolute; inset: 0; background: var(--line); border-radius: 999px;
+    cursor: pointer; transition: .15s; }
+  .sw span::before { content: ""; position: absolute; width: 17px; height: 17px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: .15s; }
+  .sw input:checked + span { background: var(--ok); }
+  .sw input:checked + span::before { transform: translateX(19px); }
+  .addbox { border: 1px dashed var(--line); border-radius: 8px; padding: 14px; margin-bottom: 14px; background: var(--surface-2); }
+  .addbox .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .addbox input, .addbox textarea {
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px;
+    font-size: 13px; font-family: inherit; background: var(--surface); color: var(--ink);
+  }
+  .addbox input.url { flex: 1; min-width: 240px; }
+  .addbox textarea { width: 100%; min-height: 54px; margin-top: 8px; resize: vertical; }
+  .probe { margin-top: 11px; border-radius: 7px; padding: 11px 13px; font-size: 13px; line-height: 1.65; }
+  .probe.ok   { background: var(--ok-bg); color: var(--ok); }
+  .probe.warn { background: var(--hi-bg); color: var(--hi); }
+  .probe.bad  { background: var(--warn-bg); color: var(--warn); }
+  .probe b { font-weight: 700; }
+  .probe .nums { font-variant-numeric: tabular-nums; opacity: .9; font-size: 12.5px; margin-top: 4px; }
+  button.ghost { border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-family: inherit; }
+  button.ghost:hover { border-color: var(--warn); color: var(--warn); }
+  button.ghost:disabled { opacity: .45; cursor: not-allowed; }
   a { color: var(--accent-ink); }
-  .empty { padding: 30px; text-align: center; color: var(--ink-soft); }
+  .empty { padding: 26px; text-align: center; color: var(--ink-soft); }
+  .chrow { display: flex; gap: 13px; align-items: flex-start; padding: 14px;
+    border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; background: var(--surface); }
+  .chrow.on { border-color: var(--accent); background: var(--surface-2); }
+  .chrow.dead { opacity: .58; }
+  .chrow > .body { flex: 1; min-width: 0; }
+  .chrow .nm { font-weight: 650; font-size: 14px; }
+  .chrow .meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 4px; line-height: 1.6; }
+  .chrow .acts { display: flex; gap: 7px; flex: none; align-items: center; }
+  .skrow .acts { display: flex; gap: 7px; flex: none; align-items: center; }
+  .skrow .acts button { white-space: nowrap; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; margin-right: 6px; }
+  .pill.ok   { background: var(--ok-bg); color: var(--ok); }
+  .pill.bad  { background: var(--warn-bg); color: var(--warn); }
+  .pill.mid  { background: var(--hi-bg); color: var(--hi); }
+  .apiform { margin-top: 10px; display: none; }
+  .apiform.on { display: block; }
+  .apiform .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
+  .apiform input, .apiform select {
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 13px;
+    font-family: inherit; background: var(--surface); color: var(--ink); flex: 1; min-width: 170px; }
+
+  /* ---- 数字员工壳：左侧功能栏 + 主区 ---- */
+  .app { display: grid; grid-template-columns: 216px minmax(0,1fr); min-height: 100vh; }
+  .side { background: var(--surface); border-right: 1px solid var(--line);
+    padding: 14px 10px 12px; display: flex; flex-direction: column; gap: 3px;
+    position: sticky; top: 0; height: 100vh; overflow: auto; }
+  .side .brand { display: flex; gap: 10px; align-items: center; padding: 2px 8px 13px;
+    border-bottom: 1px solid var(--line); margin-bottom: 9px; }
+  .side .brand b { font-size: 14.5px; color: var(--accent-ink); display: block; line-height: 1.3; }
+  .side .brand small { font-size: 11px; color: var(--ink-soft); }
+  .avatar { width: 36px; height: 36px; border-radius: 10px; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; flex: none; }
+  .side button.nav { display: block; width: 100%; text-align: left; border: none; background: transparent;
+    color: var(--ink-soft); padding: 8px 12px; border-radius: 8px; cursor: pointer;
+    font-size: 13.8px; font-family: inherit; }
+  .side button.nav:hover { background: var(--surface-2); }
+  .side button.nav.on { background: var(--accent-soft); color: var(--accent-ink); font-weight: 650; }
+  .side .foot { margin-top: auto; padding: 10px 8px 0; border-top: 1px solid var(--line); }
+  .main { min-width: 0; }
+  .wrap { padding: 16px 22px 30px; }
+  .screen { border-radius: 10px; }
+  .chatwrap { max-width: 900px; margin: 0 auto; }
+  .chat-full { height: calc(100vh - 175px); position: static; }
+  .actionbtn { display: block; margin-top: 9px; border: 1px solid var(--accent); background: var(--accent);
+    color: #fff; border-radius: 7px; padding: 6px 14px; font-size: 12.5px; cursor: pointer;
+    font-family: inherit; font-weight: 600; }
+  .actionbtn:disabled { opacity: .55; cursor: default; }
+  .memrow { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 13px; margin-bottom: 8px; background: var(--surface); }
+  .memrow .c { flex: 1; font-size: 13.5px; }
+  .hourchips { display: flex; gap: 6px; flex-wrap: wrap; margin: 13px 0; }
+  .hourchips button { border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
+    border-radius: 7px; padding: 5px 0; width: 46px; cursor: pointer; font-size: 12.5px;
+    font-family: inherit; font-variant-numeric: tabular-nums; }
+  .hourchips button.on { background: var(--accent-soft); border-color: var(--accent);
+    color: var(--accent-ink); font-weight: 700; }
+  .schedbox { border: 1px solid var(--line); border-radius: 9px; padding: 16px 18px; background: var(--surface); }
+  .schedbox .row1 { display: flex; gap: 10px; align-items: center; }
+  .skrow { display: flex; gap: 13px; align-items: flex-start; border: 1px solid var(--line);
+    border-radius: 9px; padding: 14px 16px; margin-bottom: 10px; background: var(--surface); }
+  .skrow .ico { font-size: 20px; flex: none; }
+  .skrow .b { flex: 1; min-width: 0; }
+  .skrow .nm { font-weight: 650; font-size: 14px; }
+  .skrow .ds { font-size: 12.8px; color: var(--ink-soft); margin-top: 3px; line-height: 1.6; }
+  .kbsec { margin-bottom: 18px; }
+  .kbsec h4 { margin: 0 0 8px; font-size: 14px; color: var(--accent-ink); }
+  .chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 11px; font-size: 12.5px; margin: 0 6px 6px 0; color: var(--ink-soft); }
+  .mdview { line-height: 1.75; }
+  .mdview h1 { font-size: 19px; margin: 0 0 10px; color: var(--accent-ink); }
+  .mdview h2 { font-size: 15.5px; margin: 22px 0 9px; padding-bottom: 5px;
+    border-bottom: 1px solid var(--line); color: var(--accent-ink); }
+  .mdview p { margin: 8px 0; }
+  .mdview ol, .mdview ul { margin: 8px 0; padding-left: 22px; }
+  .mdview li { margin: 3px 0; }
+  .mdview table { margin: 10px 0; }
+  .mdview code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .mdedit { width: 100%; min-height: 62vh; border: 1px solid var(--line); border-radius: 8px;
+    padding: 13px 15px; font-size: 13px; line-height: 1.7; background: var(--surface);
+    color: var(--ink); resize: vertical;
+    font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .kbbar { display: flex; gap: 9px; align-items: center; margin-bottom: 13px; flex-wrap: wrap; }
+  .kbbar .msg-inline { font-size: 12.5px; }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .side .brand { border: none; margin: 0; padding: 2px 8px; }
+    .side button.nav { width: auto; }
+    .side .foot { margin: 0; border: none; padding: 0; }
+    .chat-full { height: 68vh; }
+  }
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <div class="logo">氢能商机雷达<small>氢璞创能 · 国内模式</small><span class="ver" id="ver">v0.0.1</span></div>
-  <div class="stats" id="stats"></div>
-</div>
+<div class="app">
+<aside class="side">
+  <div class="brand">
+    <div class="avatar">氢</div>
+    <div><b>氢能商机雷达</b><small>数字员工 · 氢璞创能销售助理</small></div>
+  </div>
+  <button class="nav on" data-s="s0">💬 对话</button>
+  <button class="nav" data-s="s1">📋 商机看板</button>
+  <button class="nav" data-s="s2">📡 信号流</button>
+  <button class="nav" data-s="s3">🌐 数据源</button>
+  <button class="nav" data-s="s5">📚 知识库</button>
+  <button class="nav" data-s="s6">🧠 记忆</button>
+  <button class="nav" data-s="s7">⏰ 定时任务</button>
+  <button class="nav" data-s="s8">🛠️ 技能</button>
+  <button class="nav" data-s="s4">🔌 模型通道</button>
+  <div class="foot"><span class="ver" id="ver">v0.0.1</span></div>
+</aside>
 
-<div class="tabs" role="tablist">
-  <button class="on" data-s="s1" role="tab">信号流</button>
-  <button data-s="s2" role="tab">线索详情</button>
-  <button data-s="s3" role="tab">商机看板</button>
-  <button data-s="s4" role="tab">海外模式</button>
+<div class="main">
+<div class="topbar">
+  <div class="stats" id="stats"></div>
+  <div class="runbox">
+    <div class="runinfo" id="runinfo">采集状态加载中…</div>
+    <button class="act" id="btn-collect" onclick="collectNow()">立即采集</button>
+  </div>
 </div>
 
 <div class="wrap">
-  <section class="screen on" id="s1">
-    <div class="banner" id="b1">加载中…</div>
+  <!-- 首页：与数字员工的对话 -->
+  <section class="screen on" id="s0">
+    <div class="chatwrap">
+      <div class="chat chat-full">
+        <h3>对话<small id="chat-sub">全局模式：直接吩咐，或问整个看板</small></h3>
+        <div class="msgs" id="msgs"></div>
+        <div class="quick" id="quick"></div>
+        <div class="composer">
+          <input id="q" placeholder="问看板、要采集、让我记住偏好，都行…" onkeydown="if(event.key==='Enter')sendChat()">
+          <button onclick="sendChat()">发送</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 商机看板：纯卡片流，点卡片=把线索递给员工细问 -->
+  <section class="screen" id="s1">
+    <div class="filters" id="filters"></div>
+    <div class="cardflow" id="cardflow"></div>
+  </section>
+
+  <section class="screen" id="s2">
+    <div class="banner" id="b2">加载中…</div>
     <div class="tablebox"><table>
-      <thead><tr><th>#</th><th>标题</th><th>来源</th><th>正文</th><th>抓取时间</th></tr></thead>
+      <thead><tr><th>#</th><th>标题</th><th>来源</th><th>正文</th><th>时间</th></tr></thead>
       <tbody id="sig-rows"></tbody>
     </table></div>
   </section>
 
-  <section class="screen" id="s2">
-    <div class="banner" id="b2">从「商机看板」或下表点选一条线索查看详情</div>
-    <div class="cols">
-      <div class="panel">
-        <h3>线索列表</h3>
-        <div class="tablebox"><table>
-          <thead><tr><th>评分</th><th>公司</th><th>类型</th><th>推荐产品</th></tr></thead>
-          <tbody id="lead-rows"></tbody>
-        </table></div>
-      </div>
-      <div class="panel" id="detail"><h3>线索详情</h3><p class="muted">尚未选择线索。</p></div>
-    </div>
-  </section>
-
   <section class="screen" id="s3">
-    <div class="banner" id="b3"></div>
-    <div class="board" id="board"></div>
+    <div class="banner">数据源可增可删。填一个网址，系统会真去抓一次、告诉你它读到了什么，能用才让你保存——不做"保存成功但采集永远零产出"这种事。</div>
+    <div class="addbox">
+      <div class="row">
+        <input class="url" id="newurl" placeholder="粘一个网址，站点首页或栏目页都行，系统自己判断"
+               onkeydown="if(event.key==='Enter')doProbe()">
+        <button class="act" id="btn-probe" onclick="doProbe()">探测</button>
+      </div>
+      <div id="probeout"></div>
+    </div>
+    <div id="srclist"></div>
   </section>
 
+  <!-- 模型通道：进页面自动探测三条通道，由用户自己选用哪一条 -->
   <section class="screen" id="s4">
-    <div class="banner">海外模式（氢质氢离）：本期不在开发范围内，为静态占位。</div>
-    <div class="panel">
-      <h3>规划中的海外信号源</h3>
-      <p class="muted">同一条六段式管线，切换信号源即可复用：</p>
-      <ul class="muted">
-        <li>TED 欧盟招标公告（CPV 代码 + 关键词检索）</li>
-        <li>UNGM 联合国采购、世界银行项目库</li>
-        <li>IEA 氢能项目数据库（在建 / 已 FID 项目业主）</li>
-        <li>国际展会展商名录：Hannover Messe、FC EXPO、H2 MEET</li>
-        <li>海关提单数据反查真实进口商</li>
-      </ul>
-      <p class="muted">触达物由中文作战卡切换为英文开发信 + LinkedIn 序列。</p>
+    <div class="banner">进这一页会先做一次<b>快速探测</b>（只看装没装、配没配，不花额度）。
+      要真正启用某条通道，得点「测试并启用」——服务端会发一次真实请求，
+      CLI 通道还会额外跑一次<b>子进程隔离探针</b>：往目录外放一个随机口令，
+      让模型去读、去执行 shell，读到了就说明它仍带着工具能力，直接拒绝启用。
+      测不过就不保存，绝不留一条「看起来选上了、实际用不了」的通道。</div>
+    <div id="chlist"><div class="empty">探测中…</div></div>
+    <div id="chout"></div>
+  </section>
+
+  <!-- 知识库：员工研判商机的依据，只读 -->
+  <section class="screen" id="s5">
+    <div class="banner">员工做研判的本体知识库，就是仓库里的 <b>knowledge.md</b>。
+      正文每一节都会原样注入对应环节的提示词——<b>改这里等于改员工的判断标准</b>。
+      保存前会校验；<b>改动只影响之后新研判的线索，已入库的分数不会自动重算</b>。</div>
+    <div class="kbbar">
+      <button class="act" id="kb-edit" onclick="kbToggle()">编辑</button>
+      <button class="ghost" id="kb-cancel" onclick="kbCancel()" style="display:none">取消</button>
+      <span class="muted" id="kb-msg"></span>
     </div>
+    <div id="kbout" class="empty">加载中…</div>
+    <textarea class="mdedit" id="kbedit" style="display:none" spellcheck="false"></textarea>
+  </section>
+
+  <!-- 记忆：销售的关注偏好，注入每轮对话 -->
+  <section class="screen" id="s6">
+    <div class="banner">长期记忆 = 你的关注偏好（例如「重点盯广东」「制氢设备优先」）。
+      每轮对话都会注入给员工；也可以在对话里直接说「记住：……」。上限 50 条，存本机不进仓库。</div>
+    <div class="addbox"><div class="row">
+      <input class="url" id="mem-in" placeholder="例如：重点关注广东省的制氢设备商机"
+             onkeydown="if(event.key==='Enter')addMemory()">
+      <button class="act" onclick="addMemory()">记住</button>
+    </div></div>
+    <div id="memlist"><div class="empty">加载中…</div></div>
+  </section>
+
+  <!-- 定时任务：员工的出勤表 -->
+  <section class="screen" id="s7">
+    <div class="banner">员工按下列时刻自动执行一轮「采集 → 研判 → 归并 → 配型 → 出卡」全链路，
+      每轮最多新增 25 条信号。点小时格子即改即存；正在采集时到点会顺延，不会并发跑两轮。</div>
+    <div class="schedbox">
+      <div class="row1">
+        <label class="sw"><input type="checkbox" id="sch-on" onchange="saveSchedule()"><span></span></label>
+        <b>启用定时执行</b>
+        <button class="act" style="margin-left:auto" onclick="collectNow()">立即执行一次</button>
+      </div>
+      <div class="hourchips" id="hourchips"></div>
+      <div id="schinfo" class="muted">加载中…</div>
+    </div>
+  </section>
+
+  <!-- 技能：员工现在真实具备的能力，没有摆设 -->
+  <section class="screen" id="s8">
+    <div class="banner">技能 = <b>radar/skills/</b> 下的 Markdown 文件：frontmatter 定元数据、正文就是提示词。
+      可增删改、可启停，启用后会出现在线索的操作区。技能里的模型<b>同样没有任何工具</b>，
+      只产出一段分析文本，不会产生副作用。</div>
+    <div class="kbbar">
+      <button class="act" onclick="skNew()">＋ 新建技能</button>
+      <span class="muted" id="sk-msg"></span>
+    </div>
+    <div id="sk-editor" style="display:none">
+      <div class="addbox"><div class="row">
+        <input class="url" id="sk-key" placeholder="文件名（中文/字母/数字，不含斜杠）">
+        <button class="act" onclick="skSave()">保存</button>
+        <button class="ghost" onclick="skCloseEditor()">取消</button>
+      </div>
+      <div class="muted" id="sk-ph" style="margin-top:8px"></div></div>
+      <textarea class="mdedit" id="sk-body" spellcheck="false"></textarea>
+    </div>
+    <div id="skills"></div>
   </section>
 </div>
+</div><!-- /.main -->
+</div><!-- /.app -->
 
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => (s ?? '').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let LEADS = [];
+let LEADS = [], FILTER = 'all', SEL = null, WAS_RUNNING = false, STATS = null;
+const CARD_MD = {};   // 作战卡 markdown 原文，按 lead_id 缓存，供一键复制
 
-document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
+function navTo(id) {
+  document.querySelectorAll('.side button.nav').forEach(x => x.classList.toggle('on', x.dataset.s === id));
   document.querySelectorAll('.screen').forEach(x => x.classList.remove('on'));
-  b.classList.add('on'); $('#' + b.dataset.s).classList.add('on');
-});
+  $('#' + id).classList.add('on');
+  if (id === 's4') loadChannels();      // 模型通道：进页即探测
+  if (id === 's5') loadKnowledge();
+  if (id === 's6') loadMemory();
+  if (id === 's7') loadSchedule();
+  if (id === 's8') renderSkills();
+}
+document.querySelectorAll('.side button.nav').forEach(b => b.onclick = () => navTo(b.dataset.s));
+
+// 看板卡片点击 = 把这条线索递给员工细问：跳到对话页并选中
+function openLead(id) { navTo('s0'); selectLead(id); }
 
 function scoreClass(s, status) {
   if (status === 'rejected') return 's-rej';
@@ -187,23 +452,502 @@ function scoreClass(s, status) {
   return s >= 80 ? 's-hi' : s >= 60 ? 's-mid' : 's-lo';
 }
 
-async function load() {
-  const [st, sigs, leads] = await Promise.all([
-    fetch('/api/stats').then(r => r.json()),
-    fetch('/api/signals').then(r => r.json()),
-    fetch('/api/leads').then(r => r.json()),
-  ]);
-  LEADS = leads;
+// 字段值的溯源标注：原文逐字可查的照常显示，模型推断出来的必须标出来，
+// 否则评委点开来源核对时会发现看板上的地名在公告里根本不存在。
+function traced(value, trace, unsourced) {
+  if (!value) return '<span class="muted">公告未提及</span>';
+  const v = esc(value);
+  if (trace === 'inferred' || trace === 'partial') {
+    const miss = (unsourced || []).join('、');
+    return `${v} <span class="tag infer" title="${esc(miss)} 未见于公告原文，由模型据行业常识推断">系统推断${miss ? '：' + esc(miss) : ''}</span>`;
+  }
+  return `${v} <span class="tag ok" title="该值可在公告原文中逐字查到">原文可查</span>`;
+}
 
-  // 版本号以后端 VERSION 为准，HTML 里的 v0.0.1 只是接口没通时的兜底
-  if (st.version) $('#ver').textContent = 'v' + st.version;
+// 「当前阶段」参照氢璞样例客户信息表，由信号类型直接映射，不做额外推断
+const STAGE = { '招标': '已挂网在招', '中标': '已定标', '签约': '已签约',
+                '投运': '已运营', '项目规划': '规划中', '政策': '政策窗口' };
 
-  $('#stats').innerHTML = [
-    ['signals', '真实信号'], ['leads', '有效线索'], ['matched', '已配型号'],
-    ['cards', '作战卡'], ['high', '高分商机'],
-  ].map(([k, l]) => `<div class="stat"><div class="k num">${st[k]}</div><div class="lbl">${l}</div></div>`).join('');
+// 官方结构化字段（如 TED 的采购邮箱）与从正文正则命中的，可信度不同，
+// 必须能一眼分辨；两者都附原文片段，悬停即可核对是不是采购方本人的。
+function contactHtml(c) {
+  if (!c || !c.length) return '<span class="muted">公告未载</span>';
+  return c.map(x => `${esc(x.label)} ${esc(x.value)} `
+    + `<span class="tag ${x.official?'ok':'infer'}" title="${esc(x.context||'')}">`
+    + `${x.official ? '官方字段' : '正文命中'}</span>`).join('　');
+}
 
-  $('#b1').textContent = `共 ${sigs.length} 条公告，抓取自公开行业站点（抓取时间 ${(sigs[0]?.fetched_at || '').slice(0, 10)}）；`
+// 「所属行业」是归类字段，不是原文摘录——必须与实证字段区分标注，
+// 否则会让人以为公告里逐字写着"钢铁冶金"。
+function classified(v) {
+  if (!v) return '<span class="muted">未归类</span>';
+  return `${esc(v)} <span class="tag cls" title="由采购方性质与标的用途判定的归类，非公告原文摘录">归类</span>`;
+}
+
+
+// 发布时效：招标有窗口期，三个月前的公告和昨天的公告不该长得一样。
+// 只做展示提醒，不参与打分——打分维度的改动是数据侧的事。
+function ageHtml(ts) {
+  if (!ts) return '<span class="muted" style="margin-left:auto">日期未载</span>';
+  const d = Math.floor((Date.now() - new Date(ts.replace(' ', 'T'))) / 86400000);
+  if (isNaN(d)) return `<span class="muted" style="margin-left:auto">${esc(ts.slice(0, 10))}</span>`;
+  const label = d <= 0 ? '今天发布' : d < 30 ? `${d} 天前发布` : d < 90 ? `${Math.floor(d/30)} 个月前发布` : `${Math.floor(d/30)} 个月前·较旧`;
+  return d >= 90
+    ? `<span class="tag stale" style="margin-left:auto" title="公告发布于 ${esc(ts.slice(0,16))}，距今 ${d} 天，跟进前先确认商机是否仍有效">${label}</span>`
+    : `<span class="muted" style="margin-left:auto" title="公告发布于 ${esc(ts.slice(0,16))}">${label}</span>`;
+}
+
+function leadCard(l) {
+  const stage = STAGE[l.signal_type] || (l.signal_type || '—');
+  return `<div class="lcard ${SEL===l.id?'sel':''}" onclick="openLead(${l.id})">
+    <div class="hd">
+      <span class="score-pill ${scoreClass(l.score,l.status)}">${l.status==='rejected'?'非商机':(l.score ?? '—')}</span>
+      <span class="co">${esc(l.company) || '<span class="muted">未提及主体</span>'}</span>
+      ${l.overseas ? '<span class="tag sea">海外</span>' : ''}
+      ${l.corroboration ? '<span class="tag ok" title="另有独立来源佐证">交叉验证</span>' : ''}
+    </div>
+    <dl class="grid6">
+      <dt>所属行业</dt><dd>${classified(l.industry)}</dd>
+      <dt>所在地区</dt><dd>${traced(l.region, l.region_trace, l.region_unsourced)}</dd>
+      <dt>商机类型</dt><dd>${esc(l.signal_type) || '—'}${l.power_range ? '　<span class="muted">'+esc(l.power_range)+'</span>' : ''}</dd>
+      <dt>预计采购量</dt><dd>${esc(l.amount) || '<span class="muted">公告未提及</span>'}</dd>
+      <dt>当前阶段</dt><dd>${esc(stage)}</dd>
+      <dt>联系方式</dt><dd>${contactHtml(l.contact)}</dd>
+    </dl>
+    <div class="ft">
+      ${l.matched_product ? `<span class="tag">${esc(l.matched_product)}</span>` : '<span class="tag none">未配型号</span>'}
+      ${l.has_card ? '<span class="tag ok">有作战卡</span>' : ''}
+      <a href="${esc(l.source_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">回源核对 ↗</a>
+      ${ageHtml(l.published_at)}
+    </div>
+  </div>`;
+}
+
+const FILTERS = [
+  ['all',  '全部',       l => l.status !== 'rejected'],
+  ['high', '高分 ≥80',   l => l.status !== 'rejected' && l.score >= 80],
+  ['mid',  '中分 60-79', l => l.status !== 'rejected' && l.score >= 60 && l.score < 80],
+  ['sea',  '海外',       l => l.status !== 'rejected' && l.overseas],
+  ['card', '有作战卡',   l => l.status !== 'rejected' && l.has_card],
+  ['rej',  '已判非商机', l => l.status === 'rejected'],
+];
+
+function renderBoard() {
+  $('#filters').innerHTML = FILTERS.map(([k,label,fn]) =>
+    `<button class="${FILTER===k?'on':''}" onclick="setFilter('${k}')">${label}（${LEADS.filter(fn).length}）</button>`).join('');
+  const fn = (FILTERS.find(f => f[0] === FILTER) || FILTERS[0])[2];
+  const items = LEADS.filter(fn);
+  $('#cardflow').innerHTML = items.map(leadCard).join('')
+    || '<div class="empty">该分档下暂无线索。管线尚未研判的信号见「信号流」。</div>';
+}
+function setFilter(k) { FILTER = k; renderBoard(); }
+
+async function selectLead(id) {
+  SEL = id; renderBoard();
+  if ($('#s1').classList.contains('on')) {
+    const selEl = document.querySelector('.lcard.sel');
+    if (selEl) selEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  const l = LEADS.find(x => x.id === id);
+  $('#chat-sub').textContent = `线索 #${id}　${l.company || '未提及主体'}`;
+  $('#q').placeholder = `问线索 #${id} 的细节…`;
+  $('#quick').innerHTML = [
+    '这条线索为什么出得来？', '评分依据在原文哪里？', '为什么推荐这个型号？'
+  ].map(q => `<button onclick="ask('${q}')">${q}</button>`).join('')
+  + (SKILLS.custom || []).filter(s => s.enabled).map(s =>
+      `<button onclick="runSkill('${esc(s.key)}','${esc(s.name)}')">${esc(s.icon)} ${esc(s.name)}</button>`).join('')
+  + `<button onclick="chatHome()" title="取消选中，回到对整个看板提问">« 返回全局</button>`;
+  let intro = `已选中线索 #${id}。评分 ${l.score ?? '—'}｜${l.score_reason || '暂无评分理由'}`;
+  if (l.corroboration) intro += `\n\n交叉验证：${l.corroboration}`;
+  $('#msgs').innerHTML = `<div class="msg a">${esc(intro)}</div>`;
+  if (l.has_card) {
+    const r = await fetch(`/api/leads/${id}/card`);
+    if (r.ok) {
+      CARD_MD[id] = await r.text();
+      $('#msgs').innerHTML += `<div class="msg a"><b>商机作战卡</b><div class="card-doc">${esc(CARD_MD[id])}</div>`
+        + `<button class="copybtn" onclick="copyCard(${id}, this)">复制作战卡</button></div>`;
+    }
+  }
+  $('#msgs').scrollTop = 0;
+}
+
+function ask(q) { $('#q').value = q; sendChat(); }
+
+// 回到全局模式：不选任何线索，对整个看板提问
+function chatHome() {
+  SEL = null; renderBoard();
+  $('#chat-sub').textContent = '全局模式：直接吩咐，或问整个看板';
+  $('#q').placeholder = '问看板、要采集、让我记住偏好，都行…';
+  $('#quick').innerHTML = [
+    '哪些线索值得今天就跟进？', '制氢设备相关的商机有哪些？', '帮我采集一下最新数据'
+  ].map(q => `<button onclick="ask('${q}')">${q}</button>`).join('');
+  const s = STATS || {};
+  $('#msgs').innerHTML = `<div class="msg a">${esc(
+    `我在。当前盘面：真实信号 ${s.signals ?? '—'} 条（海外 ${s.overseas ?? '—'}），`
+    + `在研线索 ${s.leads ?? '—'} 条，判非商机 ${s.rejected ?? '—'} 条，作战卡 ${s.cards ?? '—'} 张待跟进。\n`
+    + `直接提问或吩咐——回答会引用 #线索ID，点击可跳转；`
+    + `要我采集数据、记住你的偏好，我会先说清动作、你点按钮确认才执行。`)}</div>`;
+}
+
+// 把回答里的 #123 变成可点击跳转——只认看板上真实存在的线索号，不给幻觉编号做链接
+function linkCites(text) {
+  return esc(text)
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')   // 模型爱输出 markdown 粗体，转成真粗体
+    .replace(/#(\d+)/g, (m, id) =>
+      LEADS.some(l => l.id === +id) ? `<span class="lk" onclick="selectLead(${id})">${m}</span>` : m);
+}
+
+async function copyCard(id, btn) {
+  const md = CARD_MD[id];
+  if (!md) return;
+  try { await navigator.clipboard.writeText(md); }
+  catch (e) {   // 非安全上下文的兜底
+    const ta = document.createElement('textarea');
+    ta.value = md; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+  btn.textContent = '已复制 ✓（可直接粘进微信/邮件）';
+  setTimeout(() => { btn.textContent = '复制作战卡'; }, 2500);
+}
+
+// —— 动作协议：模型只提"提案"，这里把它渲染成按钮，点了才真执行 ——
+function appendA(text) {
+  const m = document.createElement('div');
+  m.className = 'msg a'; m.textContent = text;
+  $('#msgs').appendChild(m); $('#msgs').scrollTop = 1e9;
+}
+
+function actionEl(a) {
+  const label = { collect: '▶ 执行：立即采集并研判',
+                  open_lead: `▶ 打开线索 #${a.id}`,
+                  filter_board: '▶ 执行：按此筛选看板',
+                  remember: '▶ 确认记住这条偏好' }[a.type] || '▶ 执行';
+  const b = document.createElement('button');
+  b.className = 'actionbtn'; b.textContent = label;
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      if (a.type === 'collect') {
+        const r = await fetch('/api/collect', { method: 'POST' });
+        const d = await r.json();
+        appendA(d.started ? '已开始采集。进度看右上角状态，完成后各页数字自动更新。'
+                          : '没有启动：' + (d.reason || '未知原因'));
+        loadRun();
+      } else if (a.type === 'open_lead') {
+        selectLead(a.id);
+      } else if (a.type === 'filter_board') {
+        setFilter(a.filter); navTo('s1');
+      } else if (a.type === 'remember') {
+        const r = await fetch('/api/memory', { method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+          body: JSON.stringify({ content: a.content }) });
+        if (r.ok) { appendA('已记住：' + a.content + '（可在「记忆」页管理）'); }
+        else { const d = await r.json().catch(() => ({})); appendA('没记上：' + (d.detail || r.status)); b.disabled = false; }
+      }
+    } catch (e) { appendA('执行失败：' + e); b.disabled = false; }
+  };
+  return b;
+}
+
+// —— 知识库页：MD 本体库，可看可改 ——
+// 自带极简渲染器（标题/表格/列表/加粗/行内码），不引第三方库：
+// 这个页面要在离线、无 CDN 的评审机器上照常打得开。
+function mdRender(md) {
+  const inline = t => esc(t)
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+  const out = []; let i = 0; const lines = md.split('\n');
+  const closeList = st => { while (st.length) out.push(st.pop()); };
+  const stack = [];
+  while (i < lines.length) {
+    const ln = lines[i];
+    if (/^\|/.test(ln) && /^\|[\s:|-]+\|$/.test(lines[i + 1] || '')) {
+      closeList(stack);
+      const cells = r => r.split('|').slice(1, -1).map(c => c.trim());
+      const head = cells(ln); i += 2;
+      const rows = [];
+      while (i < lines.length && /^\|/.test(lines[i])) rows.push(cells(lines[i++]));
+      out.push('<div class="tablebox"><table><thead><tr>'
+        + head.map(h => `<th>${inline(h)}</th>`).join('') + '</tr></thead><tbody>'
+        + rows.map(r => '<tr>' + r.map(c => `<td>${inline(c)}</td>`).join('') + '</tr>').join('')
+        + '</tbody></table></div>');
+      continue;
+    }
+    let m;
+    if ((m = ln.match(/^(#{1,3})\s+(.*)$/))) {
+      closeList(stack); out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`);
+    } else if ((m = ln.match(/^\s*\d+\.\s+(.*)$/))) {
+      if (stack[stack.length - 1] !== '</ol>') { closeList(stack); out.push('<ol>'); stack.push('</ol>'); }
+      out.push(`<li>${inline(m[1])}</li>`);
+    } else if ((m = ln.match(/^\s*[-*]\s+(.*)$/))) {
+      if (stack[stack.length - 1] !== '</ul>') { closeList(stack); out.push('<ul>'); stack.push('</ul>'); }
+      out.push(`<li>${inline(m[1])}</li>`);
+    } else if (ln.trim() === '') {
+      closeList(stack);
+    } else {
+      closeList(stack); out.push(`<p>${inline(ln)}</p>`);
+    }
+    i++;
+  }
+  closeList(stack);
+  return out.join('');
+}
+
+let KB_RAW = '';
+async function loadKnowledge() {
+  const box = $('#kbout');
+  try {
+    const kb = await fetch('/api/knowledge').then(r => r.json());
+    KB_RAW = kb.content || '';
+    // frontmatter 是机器契约，渲染成结构化摘要；--- 之后的正文才走 Markdown
+    const parts = KB_RAW.split('---');
+    const body = parts.length >= 3 ? parts.slice(2).join('---') : KB_RAW;
+    const w = kb.meta?.scoring_weights || {};
+    const wname = { demand_certainty: '需求确定性', power_match: '功率匹配',
+                    customer_type: '客户类型', region_timing: '区域时机' };
+    box.className = 'mdview';
+    box.innerHTML = (kb.problems && kb.problems.length
+        ? `<div class="probe bad"><b>知识库当前不合法，管线会拒绝运行：</b>${esc(kb.problems.join('；'))}</div>`
+        : '')
+      + `<div class="kbsec"><h4>评分权重（机器契约 · 四项须合计 100）</h4><div>`
+      + Object.entries(wname).map(([k, n]) => `<span class="chip"><b>${n}</b> ${w[k] ?? '—'} 分</span>`).join('')
+      + `</div></div>`
+      + `<div class="kbsec"><h4>行业分类表（机器契约 · 「所属行业」的取值域，${(kb.meta?.industry_taxonomy || []).length} 类）</h4><div>`
+      + (kb.meta?.industry_taxonomy || []).map(t => `<span class="chip">${esc(t)}</span>`).join('')
+      + `</div></div>`
+      + mdRender(body);
+    $('#kb-msg').textContent = `权重合计 ${Object.values(kb.meta?.scoring_weights || {})
+      .reduce((a, b) => a + b, 0)} 分 · 行业分类 ${(kb.meta?.industry_taxonomy || []).length} 类 · `
+      + `${Object.keys(kb.sections || {}).length} 个小节`;
+  } catch (e) { box.className = 'empty'; box.textContent = '加载失败：' + e; }
+}
+
+function kbToggle() {
+  const editing = $('#kbedit').style.display !== 'none';
+  if (!editing) {
+    $('#kbedit').value = KB_RAW;
+    $('#kbedit').style.display = ''; $('#kbout').style.display = 'none';
+    $('#kb-edit').textContent = '保存'; $('#kb-cancel').style.display = '';
+  } else { kbSave(); }
+}
+function kbCancel() {
+  $('#kbedit').style.display = 'none'; $('#kbout').style.display = '';
+  $('#kb-edit').textContent = '编辑'; $('#kb-cancel').style.display = 'none';
+  $('#kb-msg').textContent = '已取消，未保存';
+}
+async function kbSave() {
+  const btn = $('#kb-edit'); btn.disabled = true; $('#kb-msg').textContent = '校验并保存中…';
+  try {
+    const r = await fetch('/api/knowledge', { method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+      body: JSON.stringify({ content: $('#kbedit').value }) });
+    const d = await r.json();
+    if (!r.ok) { $('#kb-msg').innerHTML = `<span style="color:var(--warn)">未保存：${esc(d.detail || r.status)}</span>`; return; }
+    $('#kbedit').style.display = 'none'; $('#kbout').style.display = '';
+    btn.textContent = '编辑'; $('#kb-cancel').style.display = 'none';
+    await loadKnowledge();
+    $('#kb-msg').innerHTML = `<span style="color:var(--ok)">${esc(d.note)}</span>`;
+  } catch (e) { $('#kb-msg').textContent = '保存失败：' + e; }
+  finally { btn.disabled = false; }
+}
+
+// —— 记忆页 ——
+async function loadMemory() {
+  const box = $('#memlist');
+  try {
+    const ms = await fetch('/api/memory').then(r => r.json());
+    box.innerHTML = ms.length
+      ? ms.map(m => `<div class="memrow"><div class="c">${esc(m.content)}</div>`
+          + `<span class="muted">${esc((m.created_at||'').slice(5,16).replace('T',' '))}</span>`
+          + `<button class="ghost" onclick="delMemory('${m.id}')">忘掉</button></div>`).join('')
+      : '<div class="empty">还没有记忆。加一条，或在对话里说「记住：重点盯广东」。</div>';
+  } catch (e) { box.innerHTML = '<div class="empty">加载失败：' + e + '</div>'; }
+}
+async function addMemory() {
+  const v = $('#mem-in').value.trim();
+  if (!v) return;
+  const r = await fetch('/api/memory', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+    body: JSON.stringify({ content: v }) });
+  if (r.ok) { $('#mem-in').value = ''; loadMemory(); }
+  else { const d = await r.json().catch(() => ({})); alert(d.detail || ('HTTP ' + r.status)); }
+}
+async function delMemory(id) {
+  const r = await fetch('/api/memory/' + id, { method: 'DELETE', headers: { 'X-Radar-Local': '1' } });
+  if (r.ok) loadMemory();
+}
+
+// —— 定时任务页 ——
+async function loadSchedule() {
+  try {
+    const st = await fetch('/api/collect/status').then(r => r.json());
+    $('#sch-on').checked = !!st.schedule_enabled;
+    $('#hourchips').innerHTML = Array.from({ length: 24 }, (_, h) =>
+      `<button class="${st.run_hours.includes(h) ? 'on' : ''}" onclick="toggleHour(this)">${h}:00</button>`).join('');
+    $('#schinfo').innerHTML =
+      `下次自动执行：${st.next_at ? fmt(st.next_at) : '（已停用）'}　·　上次：${st.last_at ? fmt(st.last_at) : '—'}`
+      + (st.last_result ? `　${esc(st.last_result)}` : '')
+      + (st.last_error ? `<br><span style="color:var(--warn)">上次错误：${esc(st.last_error)}</span>` : '')
+      + (st.last_skip ? `<br>${esc(st.last_skip)}` : '');
+  } catch (e) { $('#schinfo').textContent = '加载失败：' + e; }
+}
+async function toggleHour(btn) { btn.classList.toggle('on'); await saveSchedule(); }
+async function saveSchedule() {
+  const hours = [...$('#hourchips').querySelectorAll('button.on')].map(b => parseInt(b.textContent));
+  const r = await fetch('/api/schedule', { method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+    body: JSON.stringify({ schedule_enabled: $('#sch-on').checked, run_hours: hours }) });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    $('#schinfo').innerHTML = `<span style="color:var(--warn)">保存失败：${esc(d.detail || r.status)}</span>`;
+    return;
+  }
+  loadSchedule(); loadRun();
+}
+
+// —— 技能页：内置能力（代码实现）+ 可装配技能（MD 文件）——
+let SKILLS = { builtin: [], custom: [], placeholders: {} };
+
+async function renderSkills() {
+  try { SKILLS = await fetch('/api/skills').then(r => r.json()); }
+  catch (e) { $('#skills').innerHTML = `<div class="empty">加载失败：${e}</div>`; return; }
+
+  const custom = SKILLS.custom.map(s => {
+    const bad = s.problems.length;
+    return `<div class="skrow ${bad || !s.enabled ? 'dead' : ''}">
+      <div class="ico">${esc(s.icon)}</div>
+      <div class="b"><div class="nm">${esc(s.name)}
+        ${bad ? '<span class="pill bad">不可用</span>'
+              : (s.enabled ? '<span class="pill ok">已启用</span>' : '<span class="pill mid">已停用</span>')}
+        </div>
+        <div class="ds">${esc(s.description)}</div>
+        ${bad ? `<div class="ds" style="color:var(--warn)">${esc(s.problems.join('；'))}</div>` : ''}
+      </div>
+      <div class="acts">
+        <label class="sw"><input type="checkbox" ${s.enabled ? 'checked' : ''}
+          ${bad ? 'disabled' : ''} onchange="skToggle('${esc(s.key)}')"><span></span></label>
+        <button class="ghost" onclick="skEdit('${esc(s.key)}')">编辑</button>
+        <button class="ghost" onclick="skDelete('${esc(s.key)}')">删除</button>
+      </div></div>`;
+  }).join('') || '<div class="empty">还没有自定义技能。点「＋ 新建技能」写一个。</div>';
+
+  const s = STATS || {};
+  const builtin = SKILLS.builtin.map(b =>
+    `<div class="skrow"><div class="ico">${b.icon}</div>
+      <div class="b"><div class="nm">${esc(b.name)} <span class="pill ok">内置</span></div>
+      <div class="ds">${esc(b.description)}</div></div></div>`).join('');
+
+  $('#skills').innerHTML =
+    `<div class="kbsec"><h4>可装配技能（${SKILLS.custom.length} 个 · 文件在 radar/skills/）</h4>${custom}</div>`
+    + `<div class="kbsec"><h4>内置能力（${SKILLS.builtin.length} 项 · 代码链路，不可编辑）</h4>${builtin}</div>`;
+  $('#sk-msg').textContent = `已启用 ${SKILLS.custom.filter(x => x.enabled).length} 个技能`
+    + ` · 已归并 ${s.duplicate ?? '—'} 条 · 作战卡 ${s.cards ?? '—'} 张`;
+}
+
+const SK_TEMPLATE = `---
+name: 新技能
+description: 一句话说明这个技能干什么（技能页会显示）
+icon: 🧩
+scope: lead
+enabled: true
+---
+你是氢璞创能的销售顾问。请针对下面这条商机做分析。
+
+采购方：{company}
+区域：{region}
+公告原文：{raw_text}
+
+请回答……（把你要模型做的事写在这里）
+`;
+
+function skPlaceholderHtml() {
+  return '可用占位符：' + Object.entries(SKILLS.placeholders)
+    .map(([k, v]) => `<span class="chip">{${k}} ${esc(v)}</span>`).join('');
+}
+function skNew() {
+  $('#sk-key').value = ''; $('#sk-key').disabled = false;
+  $('#sk-body').value = SK_TEMPLATE;
+  $('#sk-ph').innerHTML = skPlaceholderHtml();
+  $('#sk-editor').style.display = ''; $('#sk-key').focus();
+}
+async function skEdit(key) {
+  const d = await fetch('/api/skills/' + encodeURIComponent(key)).then(r => r.json());
+  $('#sk-key').value = key; $('#sk-key').disabled = true;
+  $('#sk-body').value = d.content || '';
+  $('#sk-ph').innerHTML = skPlaceholderHtml();
+  $('#sk-editor').style.display = '';
+}
+function skCloseEditor() { $('#sk-editor').style.display = 'none'; $('#sk-msg').textContent = '已取消'; }
+
+async function skSave() {
+  const key = $('#sk-key').value.trim();
+  if (!key) { $('#sk-msg').innerHTML = '<span style="color:var(--warn)">请填文件名</span>'; return; }
+  const r = await fetch('/api/skills/' + encodeURIComponent(key), { method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Radar-Local': '1' },
+    body: JSON.stringify({ content: $('#sk-body').value }) });
+  const d = await r.json();
+  if (!r.ok) { $('#sk-msg').innerHTML = `<span style="color:var(--warn)">未保存：${esc(d.detail || r.status)}</span>`; return; }
+  skCloseEditor(); await renderSkills();
+  $('#sk-msg').innerHTML = `<span style="color:var(--ok)">已保存「${esc(d.name)}」</span>`;
+}
+async function skToggle(key) {
+  const r = await fetch(`/api/skills/${encodeURIComponent(key)}/toggle`,
+    { method: 'POST', headers: { 'X-Radar-Local': '1' } });
+  if (!r.ok) { const d = await r.json().catch(() => ({}));
+    $('#sk-msg').innerHTML = `<span style="color:var(--warn)">${esc(d.detail || r.status)}</span>`; }
+  renderSkills();
+}
+async function skDelete(key) {
+  if (!confirm(`删除技能「${key}」？文件会从 radar/skills/ 里移除。`)) return;
+  const r = await fetch('/api/skills/' + encodeURIComponent(key),
+    { method: 'DELETE', headers: { 'X-Radar-Local': '1' } });
+  if (r.ok) { renderSkills(); $('#sk-msg').textContent = '已删除 ' + key; }
+}
+
+// 在选中线索的对话里跑技能
+async function runSkill(key, name) {
+  if (!SEL) return;
+  const m = document.createElement('div');
+  m.className = 'msg u'; m.textContent = `【技能】${name}`;
+  $('#msgs').appendChild(m);
+  const wait = document.createElement('div');
+  wait.className = 'msg a'; wait.textContent = `${name} 执行中…`;
+  $('#msgs').appendChild(wait); $('#msgs').scrollTop = 1e9;
+  try {
+    const r = await fetch(`/api/skills/${encodeURIComponent(key)}/run`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lead_id: SEL }) });
+    const d = await r.json();
+    if (r.ok) { wait.innerHTML = linkCites(d.answer); }
+    else { wait.className = 'msg e'; wait.textContent = d.detail || ('HTTP ' + r.status); }
+  } catch (e) { wait.className = 'msg e'; wait.textContent = '执行失败：' + e; }
+  $('#msgs').scrollTop = 1e9;
+}
+
+async function sendChat() {
+  const q = $('#q').value.trim();
+  if (!q) return;
+  $('#q').value = '';
+  $('#msgs').innerHTML += `<div class="msg u">${esc(q)}</div>`;
+  const wait = document.createElement('div');
+  wait.className = 'msg a';
+  wait.textContent = SEL ? '查证中…' : '正在通读整个看板…';
+  $('#msgs').appendChild(wait); $('#msgs').scrollTop = 1e9;
+  try {
+    const body = SEL ? { lead_id: SEL, question: q } : { question: q };
+    const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body) });
+    const d = await r.json();
+    if (r.ok) {
+      wait.innerHTML = linkCites(d.answer);
+      if (d.action) wait.appendChild(actionEl(d.action));
+    }
+    else { wait.className = 'msg e'; wait.textContent = d.detail || ('HTTP ' + r.status); }
+  } catch (e) { wait.className = 'msg e'; wait.textContent = '请求失败：' + e; }
+  $('#msgs').scrollTop = 1e9;
+}
+
+function renderSignals(sigs) {
+  $('#b2').textContent = `共 ${sigs.length} 条公告，抓取自 ${new Set(sigs.map(s=>s.source)).size} 个公开信源；`
     + `时间列为公告原始发布时间，点标题可回源核对`;
   $('#sig-rows').innerHTML = sigs.map(s => {
     const pub = (s.published_at || '').slice(0, 10);
@@ -213,96 +957,323 @@ async function load() {
       <td><a href="${esc(s.source_url)}" target="_blank" rel="noopener">${esc(s.title)}</a>
           ${stale ? '<span class="tag stale">历史存量</span>' : ''}
           <div class="muted">${esc(s.excerpt).slice(0, 90)}…</div></td>
-      <td><span class="tag">${esc(s.source)}</span></td>
+      <td><span class="tag ${s.overseas?'sea':''}">${esc(s.source)}</span></td>
       <td class="num">${s.text_len} 字</td>
       <td class="muted num">${pub || '<span class="muted">未载</span>'}
           <div class="muted" style="font-size:11px">抓取 ${esc(s.fetched_at).slice(0, 10)}</div></td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" class="empty">暂无信号</td></tr>';
-
-  renderLeads();
-  renderBoard();
 }
 
-// 字段值的溯源标注：原文逐字可查的照常显示，模型推断出来的必须标出来，
-// 否则评委点开来源核对时会发现看板上的地名在公告里根本不存在。
-function traced(value, trace, unsourced) {
-  if (!value) return '未提及';
-  const v = esc(value);
-  if (trace === 'inferred' || trace === 'partial') {
-    const miss = (unsourced || []).join('、');
-    return `${v} <span class="tag infer" title="${esc(miss)} 未见于公告原文，由模型据行业常识推断">`
-      + `系统推断${miss ? '：' + esc(miss) : ''}</span>`;
+async function loadSources() {
+  let list;
+  try {
+    const r = await fetch('/api/sources');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    list = await r.json();
+  } catch (e) {
+    $('#srclist').innerHTML = `<div class="probe bad">数据源列表加载失败：${esc(String(e))}。
+      界面上现在看到的可能不是真实配置，请刷新页面。</div>`;
+    return;
   }
-  return `${v} <span class="tag ok" title="该值可在公告原文中逐字查到">原文可查</span>`;
+  $('#srclist').innerHTML = list.map(s => `
+    <div class="srcrow ${s.enabled?'':'off'}">
+      ${s.key === '__orphan__' ? '<div class="sw"></div>' :
+        `<label class="sw"><input type="checkbox" ${s.enabled?'checked':''}
+          onchange="toggleSource('${esc(s.key)}', this.checked)"><span></span></label>`}
+      <div style="flex:1;min-width:0">
+        <div><b>${esc(s.name)}</b>
+          <span class="tag">${esc(s.kind)}</span>
+          <span class="tag ${s.signals?'ok':'none'}">已入库 ${s.signals} 条</span>
+          ${s.enabled ? `<span class="muted">配额 ${s.quota}</span>` : '<span class="tag stale">已停用</span>'}
+        </div>
+        <div class="muted" style="margin-top:4px">${esc(s.reason)}</div>
+      </div>
+      ${s.key === '__orphan__' ? '' :
+        `<button class="ghost" onclick="delSource('${esc(s.key)}', ${s.signals})">删除</button>`}
+    </div>`).join('');
 }
 
-function linkify(text) {
-  return esc(text).replace(/https?:\/\/\S+/g,
-    u => `<a href="${u}" target="_blank" rel="noopener">${u.slice(0, 46)}…</a>`);
+let PROBE = null;
+
+async function doProbe() {
+  const url = $('#newurl').value.trim();
+  if (!url) return;
+  PROBE = null;
+  $('#btn-probe').disabled = true;
+  $('#probeout').innerHTML = '<div class="probe warn">正在真抓一次这个网址，需要十几秒…</div>';
+  try {
+    const r = await fetch('/api/sources/probe', { method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url }) });
+    const d = await r.json();
+    if (!r.ok) { $('#probeout').innerHTML = `<div class="probe bad">探测失败：${esc(d.detail||'')}</div>`; return; }
+    PROBE = d;
+    renderProbe(d);
+  } catch (e) {
+    $('#probeout').innerHTML = `<div class="probe bad">探测失败：${esc(String(e))}</div>`;
+  } finally { $('#btn-probe').disabled = false; }
 }
 
-function renderLeads() {
-  const valid = LEADS.filter(l => l.status !== 'rejected');
-  $('#b2').textContent = valid.length
-    ? `${valid.length} 条有效线索，按评分降序；点击任意行查看画像、评分理由与作战卡`
-    : '尚无线索——LLM 通道恢复后运行 pipeline 即可生成（见 BLOCKED.md）';
-  $('#lead-rows').innerHTML = LEADS.map(l => `<tr class="clickable" onclick="showDetail(${l.id})">
-      <td><span class="score-pill ${scoreClass(l.score, l.status)}">${l.status === 'rejected' ? '非商机' : (l.score ?? '—')}</span></td>
-      <td>${esc(l.company) || '<span class="muted">未提及</span>'}</td>
-      <td class="muted">${esc(l.signal_type)}</td>
-      <td>${esc(l.matched_product) || '<span class="muted">—</span>'}</td>
-    </tr>`).join('') || '<tr><td colspan="4" class="empty">暂无线索</td></tr>';
-}
+function renderProbe(d) {
+  const cls = d.usable ? (d.suggest === 'save_enabled_warn' ? 'warn' : 'ok') : 'bad';
+  const sample = (d.samples || []).find(s => s.ok && s.chars > 100);
+  let html = `<div class="probe ${cls}">
+    <b>${esc(d.verdict)}</b>
+    <div class="nums">HTML ${d.page_bytes} 字节｜链接 ${d.anchors} 个｜
+      命中氢能关键词的文章链接 <b>${d.keyword_links}</b> 条
+      ${d.article_pattern ? `｜文章形态 <code>${esc(d.article_pattern)}</code>` : ''}
+      ${(d.body_selectors||[]).length ? `｜正文容器 <code>${esc(d.body_selectors[0])}</code>` : ''}</div>
+    ${(d.detail||[]).map(x=>`<div style="margin-top:5px">· ${esc(x)}</div>`).join('')}
+    ${sample ? `<div class="nums">样本正文 ${sample.chars} 字：${esc(sample.title).slice(0,44)}</div>` : ''}
+    ${(d.samples||[]).filter(x=>x.note).map(x=>
+        `<div class="nums">⚠ 样本「${esc((x.title||'').slice(0,26))}」：${esc(x.note)}</div>`).join('')}
+  </div>`;
 
-async function showDetail(id) {
-  const l = LEADS.find(x => x.id === id);
-  if (!l) return;
-  let card = '';
-  if (l.has_card) {
-    const r = await fetch(`/api/leads/${id}/card`);
-    if (r.ok) card = await r.text();
+  if (d.same_domain_source && d.usable) {
+    html += `<div class="probe warn" style="margin-top:8px">
+      这个网址属于已有数据源 <b>${esc(d.same_domain_source)}</b>。
+      建议并入它作为一个栏目页，而不是新建一个重复站点——重复站点会让同一条公告
+      在交叉验证里被当成两个独立来源。
+      <div class="row" style="margin-top:9px">
+        <button class="act" onclick="saveSource('${esc(d.same_domain_source)}')">并入《${esc(d.same_domain_source)}》</button>
+      </div></div>`;
+  } else if (d.same_domain_source) {
+    html += `<div class="probe bad" style="margin-top:8px">
+      这个网址属于已有数据源 <b>${esc(d.same_domain_source)}</b>，但它本身不可用（见上），
+      因此不提供并入选项——并进去只会让那个源每轮白跑一遍。</div>`;
+  } else if (d.usable) {
+    html += `<div class="addbox" style="margin-top:9px;background:var(--surface)">
+      <div class="row">
+        <input id="newname" placeholder="给它起个名字（如 碳索氢能网）" style="flex:1;min-width:180px">
+        <input id="newquota" type="number" value="15" min="1" max="100" style="width:110px" title="每轮最多新增几条">
+      </div>
+      <textarea id="newreason" placeholder="为什么选它？这条会写进数据源清单，用来对客户解释来源的合理性（必填）"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="act" onclick="saveSource('')">保存为新数据源</button>
+      </div></div>`;
+  } else {
+    html += `<div class="probe bad" style="margin-top:8px">
+      不可保存为启用源。撞人机验证的站点按项目规矩不绕过，只能记为停用并写明理由。</div>`;
   }
-  $('#detail').innerHTML = `<h3>线索详情 #${l.id}</h3>
-    <dl class="kv">
-      <dt>公司</dt><dd>${traced(l.company, l.company_trace, l.company_unsourced)}</dd>
-      <dt>信号类型</dt><dd>${esc(l.signal_type)}</dd>
-      <dt>功率/规模</dt><dd>${esc(l.power_range) || '未提及'}</dd>
-      <dt>区域</dt><dd>${traced(l.region, l.region_trace, l.region_unsourced)}</dd>
-      <dt>金额/数量</dt><dd>${esc(l.amount) || '未提及'}</dd>
-      <dt>评分</dt><dd><span class="score-pill ${scoreClass(l.score, l.status)}">${l.score ?? '—'}</span></dd>
-      <dt>评分理由</dt><dd>${esc(l.score_reason) || '—'}</dd>
-      <dt>推荐产品</dt><dd><b>${esc(l.matched_product) || '—'}</b></dd>
-      <dt>推荐理由</dt><dd>${esc(l.match_reason) || '—'}</dd>
-      <dt>公告发布</dt><dd>${esc((l.published_at || '').slice(0, 16)) || '<span class="muted">原文未载</span>'}</dd>
-      <dt>来源</dt><dd><a href="${esc(l.source_url)}" target="_blank" rel="noopener">${esc(l.signal_title)}</a></dd>
-      ${l.corroboration ? `<dt>交叉验证</dt><dd class="corrob">${linkify(l.corroboration)}</dd>` : ''}
-    </dl>
-    ${card ? `<h3 style="margin-top:16px">商机作战卡</h3><div class="card-doc">${esc(card)}</div>`
-           : '<p class="muted" style="margin-top:14px">该线索暂无作战卡（仅 80 分以上生成）。</p>'}`;
-  document.querySelector('.tabs button[data-s="s2"]').click();
+  $('#probeout').innerHTML = html;
 }
 
-function renderBoard() {
-  const cols = [
-    ['高分商机 ≥80', l => l.status !== 'rejected' && l.score >= 80],
-    ['中分 60-79', l => l.status !== 'rejected' && l.score >= 60 && l.score < 80],
-    ['低分 <60', l => l.status !== 'rejected' && (l.score ?? 0) < 60],
-    ['已判非商机', l => l.status === 'rejected'],
-  ];
-  $('#b3').textContent = '按评分分档的商机看板，点击卡片查看详情';
-  $('#board').innerHTML = cols.map(([name, fn]) => {
-    const items = LEADS.filter(fn);
-    return `<div class="colm"><h4>${name}（${items.length}）</h4>
-      ${items.map(l => `<div class="lead" onclick="showDetail(${l.id})">
-        <span class="t">${esc(l.company) || '未提及主体'}</span>
-        <span class="muted">${esc(l.signal_type)} ${esc(l.power_range)}</span>
-        ${l.matched_product ? `<div class="tag" style="margin-top:4px">${esc(l.matched_product)}</div>` : ''}
-      </div>`).join('') || '<p class="muted" style="font-size:12.5px">空</p>'}</div>`;
+async function saveSource(attachTo) {
+  if (!PROBE) return;
+  const body = { url: PROBE.url, attach_to: attachTo || '',
+                 name: attachTo || ($('#newname')?.value || '').trim(),
+                 reason: attachTo ? '并入已有源的栏目页' : ($('#newreason')?.value || '').trim(),
+                 quota: attachTo ? 15 : parseInt($('#newquota')?.value || '15', 10),
+                 article_pattern: PROBE.article_pattern || '',
+                 body_selectors: PROBE.body_selectors || [] };
+  const r = await fetch('/api/sources', { method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (!r.ok) { alert('保存失败：' + (d.detail || r.status)); return; }
+  $('#probeout').innerHTML = `<div class="probe ok">${esc(d.message || ('已保存：' + d.key))}</div>`;
+  $('#newurl').value = ''; PROBE = null;
+  loadSources();
+}
+
+async function delSource(key, signals) {
+  const extra = signals ? `\n\n它已抓到的 ${signals} 条信号会保留（真实抓取产物，来源链接仍可回溯）。` : '';
+  if (!confirm(`确认删除数据源「${key}」？${extra}`)) return;
+  const r = await fetch('/api/sources/' + encodeURIComponent(key), { method: 'DELETE' });
+  const d = await r.json();
+  if (!r.ok) { alert('删除失败：' + (d.detail || r.status)); return; }
+  loadSources();
+}
+
+async function toggleSource(key, enabled) {
+  try {
+    const r = await fetch(`/api/sources/${encodeURIComponent(key)}/toggle`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ enabled }) });
+    if (!r.ok) {
+      const d = await r.json().catch(()=>({}));
+      alert(`${enabled?'启用':'停用'}失败：` + (d.detail || r.status));
+    }
+  } catch (e) { alert('操作失败：' + e); }
+  loadSources();   // 无论成败都重新拉一次，保证开关状态与配置文件一致
+}
+
+function fmt(ts) { return ts ? ts.slice(5, 16).replace('T', ' ') : '—'; }
+
+async function loadRun() {
+  try {
+    const st = await (await fetch('/api/collect/status')).json();
+    $('#btn-collect').disabled = st.running;
+    $('#btn-collect').textContent = st.running ? '采集中…' : '立即采集';
+    const r = st.last_result || {};
+    let line2 = '';
+    if (st.last_error) line2 = `<span style="color:var(--warn)">上次出错：${esc(st.last_error).slice(0,60)}</span>`;
+    else if (r.crawler_error) line2 = `<span style="color:var(--warn)">采集进程异常退出</span>`;
+    else if ((r.source_errors || []).length)
+      line2 = `<span style="color:var(--warn)" title="${esc(r.source_errors.join(' / '))}">`
+            + `${r.source_errors.length} 个源未成功（悬停看原因）</span>`;
+    else if ((r.pipeline || '').startsWith('blocked'))
+      line2 = '<span style="color:var(--hi)">上轮只采集未研判（通道未登录）</span>';
+    else if (r.pipeline && /rc=[1-9]/.test(r.pipeline))
+      line2 = `<span style="color:var(--warn)">上轮研判失败（${esc(r.pipeline)}）</span>`;
+    else if (r.crawler_added !== undefined)
+      line2 = `<span style="color:var(--ok)">上轮新增 ${r.crawler_added} 条</span>`;
+    $('#runinfo').innerHTML =
+      `定时 ${st.run_hours.map(h=>h+':00').join(' / ')}　下次 ${fmt(st.next_at)}<br>`
+      + `上次 ${fmt(st.last_at)} ${line2}`;
+    if (st.running) { WAS_RUNNING = true; setTimeout(loadRun, 4000); }
+    else if (WAS_RUNNING) {
+      // 采集刚跑完：整页数据都变了，只刷状态条会让页面停在采集前的旧数字
+      WAS_RUNNING = false;
+      load().catch(()=>{});
+    }
+  } catch (e) { $('#runinfo').textContent = '采集状态不可用'; }
+}
+
+async function collectNow() {
+  $('#btn-collect').disabled = true;
+  try {
+    const r = await fetch('/api/collect', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) { alert('采集启动失败：' + (d.detail || r.status)); $('#btn-collect').disabled = false; return; }
+    if (!d.started) { alert(d.reason || '未能启动采集'); $('#btn-collect').disabled = false; return; }
+  } catch (e) {
+    alert('采集启动失败：' + e); $('#btn-collect').disabled = false; return;
+  }
+  setTimeout(loadRun, 800);
+}
+
+// ---------- 模型通道 ----------
+// 状态一律来自服务端的真实探测，前端不做任何"应该能用"的推断。
+let CH = null;
+
+// 所有会改状态的请求都带这个头：服务端拿它挡跨站伪造（见 api.py 的 _guard_local）
+const LOCAL_HEAD = { 'Content-Type': 'application/json', 'X-Radar-Local': '1' };
+
+const ISO_PILL = {
+  passed:   ['ok',  '隔离已实测通过'],
+  failed:   ['bad', '隔离探针未通过'],
+  untested: ['mid', '隔离未测'],
+};
+
+async function loadChannels() {
+  const box = $('#chlist');
+  try {
+    CH = await fetch('/api/llm/channels').then(r => r.json());
+  } catch (e) {
+    box.innerHTML = `<div class="probe bad">通道探测失败：${esc(String(e))}</div>`;
+    return;
+  }
+  box.innerHTML = CH.channels.map(c => {
+    const live = c.installed && c.configured;
+    const [ic, it] = ISO_PILL[c.isolation] || ISO_PILL.untested;
+    const badges =
+      (c.current ? '<span class="pill ok">当前在用</span>' : '') +
+      (c.installed ? '' : '<span class="pill bad">未安装</span>') +
+      (c.key === 'api' && !c.configured ? '<span class="pill mid">未填写</span>' : '') +
+      `<span class="pill ${ic}" title="${esc(c.isolation_detail || '尚未跑过隔离探针')}">${it}</span>`;
+    const form = c.key !== 'api' ? '' : `
+      <div class="apiform ${c.current || !c.configured ? 'on' : ''}" id="apiform">
+        <div class="row">
+          <input id="api-base" placeholder="Base URL，如 https://ark.cn-beijing.volces.com/api/v3"
+                 value="${esc(c.base_url || '')}">
+          <select id="api-style">
+            <option value="">自动判断接口风格</option>
+            <option value="openai"${c.style === 'openai' ? ' selected' : ''}>OpenAI 兼容 /chat/completions</option>
+            <option value="anthropic"${c.style === 'anthropic' ? ' selected' : ''}>Anthropic 原生 /v1/messages</option>
+          </select>
+        </div>
+        <div class="row">
+          <input id="api-model" placeholder="模型名，如 claude-opus-5 / deepseek-chat" value="${esc(c.model || '')}">
+          <input id="api-key" type="password" autocomplete="off"
+                 placeholder="${c.key_set ? '已保存（留空则沿用原 Key）' : 'API Key，只存本机 ~/.config，权限 0600'}">
+        </div>
+      </div>`;
+    return `<div class="chrow ${c.current ? 'on' : ''} ${live ? '' : 'dead'}">
+      <div class="body">
+        <div class="nm">${badges}${esc(c.name)}</div>
+        <div class="meta">${esc(c.detail)}</div>
+        ${form}
+      </div>
+      <div class="acts">
+        <button class="ghost" onclick="tryChannel('${c.key}', false)">仅测试</button>
+        <button class="act" onclick="tryChannel('${c.key}', true)">测试并启用</button>
+      </div>
+    </div>`;
   }).join('');
 }
 
-load().catch(e => { $('#b1').textContent = '加载失败：' + e; });
+function apiPayload(key) {
+  const p = { channel: key };
+  if (key === 'api') {
+    p.base_url = ($('#api-base') || {}).value || '';
+    p.model    = ($('#api-model') || {}).value || '';
+    p.api_key  = ($('#api-key')  || {}).value || '';
+    p.style    = ($('#api-style')|| {}).value || '';
+  }
+  return p;
+}
+
+async function tryChannel(key, enable) {
+  const out = $('#chout');
+  out.innerHTML = `<div class="probe warn">正在对 <b>${esc(key)}</b> 发真实请求…
+    ${key === 'api' ? '' : 'CLI 通道首次还要跑隔离探针，约 10-30 秒，请等它跑完。'}</div>`;
+  document.querySelectorAll('#chlist button').forEach(b => b.disabled = true);
+  try {
+    const r = await fetch('/api/llm/channels' + (enable ? '' : '/test'), {
+      method: enable ? 'PUT' : 'POST',
+      headers: LOCAL_HEAD, body: JSON.stringify(apiPayload(key)),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      out.innerHTML = `<div class="probe bad"><b>未通过，${enable ? '没有保存' : '不可用'}。</b>
+        <div class="nums">${esc(d.detail || JSON.stringify(d))}</div></div>`;
+      return;
+    }
+    const t = enable ? (d.test || {}) : d;
+    if (!t.ok) {
+      out.innerHTML = `<div class="probe bad"><b>测试未通过。</b>
+        <div class="nums">${esc(t.reason || '未知原因')}</div></div>`;
+      return;
+    }
+    out.innerHTML = `<div class="probe ok"><b>${enable ? '已启用 ' + esc(key) : esc(key) + ' 可用'}。</b>
+      <div class="nums">模型回了「${esc(t.reply || '')}」，耗时 ${t.latency_s}s。
+      ${t.isolation_detail ? '隔离探针：' + esc(t.isolation_detail) + '。' : ''}</div></div>`;
+    await loadChannels();
+  } catch (e) {
+    out.innerHTML = `<div class="probe bad">请求失败：${esc(String(e))}</div>`;
+  } finally {
+    document.querySelectorAll('#chlist button').forEach(b => b.disabled = false);
+  }
+}
+
+async function load() {
+  const [st, sigs, leads] = await Promise.all([
+    fetch('/api/stats').then(r => r.json()),
+    fetch('/api/signals').then(r => r.json()),
+    fetch('/api/leads').then(r => r.json()),
+  ]);
+  LEADS = leads; STATS = st;
+  // 预载技能清单：线索快捷区要用它渲染技能按钮，不能等用户先逛过技能页
+  if (!SKILLS.custom.length) {
+    try { SKILLS = await fetch('/api/skills').then(r => r.json()); } catch (e) {}
+  }
+  if (st.version) $('#ver').textContent = 'v' + st.version;
+  $('#stats').innerHTML = [
+    ['signals','真实信号'], ['overseas','其中海外'], ['leads','在研线索'],
+    ['rejected','判非商机'], ['matched','已配型号'], ['cards','作战卡'], ['pending','待研判'],
+  ].map(([k,l]) => `<div class="stat"><div class="k num">${st[k]}</div><div class="lbl">${l}</div></div>`).join('')
+  // 归并后失效的作战卡：后端特意算了这个数，前端丢掉就等于把它藏了
+  + (st.cards_orphan ? `<div class="stat" title="这些作战卡所属线索已被归并为重复，界面上不再可达，故不计入左侧作战卡数">`
+      + `<div class="k num" style="color:var(--ink-soft)">${st.cards_orphan}</div>`
+      + `<div class="lbl">归并后失效卡</div></div>` : '');
+  renderBoard();
+  if (!SEL) chatHome();   // 打开页面即全局模式，不用先选线索才能说话
+  renderSignals(sigs);
+  loadSources();
+  loadRun();
+}
+
+load().catch(e => { $('#cardflow').innerHTML = '<div class="empty">加载失败：' + e + '</div>'; });
 </script>
 </body>
 </html>
