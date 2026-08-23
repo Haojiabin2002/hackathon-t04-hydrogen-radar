@@ -23,8 +23,11 @@
 ```
 hackathon-t04/
 ├── CLAUDE.md                          本文件 · 全项目唯一约定来源
+├── DESIGN.md                          ⛔ 设计系统唯一来源 · 令牌 / 骨架 / 组件约定
+├── PRODUCT.md                         产品定位说明
 ├── README.md                          给人看的项目说明
 ├── .gitignore                         哪些文件不进 git
+├── Dockerfile / railway.json / deploy/  公网部署配置
 │
 ├── radar_accept.sh                    ⛔ 验收脚本 · 任何人任何情况不得修改
 ├── prototype-v0.1.html                早期静态原型 · 只读参考，不再维护
@@ -46,12 +49,36 @@ hackathon-t04/
     │
     ├── api.py                         【呈现侧】FastAPI 接口 + 托管前端 + 版本号来源
     ├── backfill_published.py          【呈现侧】一次性修复脚本：回填公告发布时间
-    ├── web/index.html                 【呈现侧】单文件看板前端
+    ├── web/index.html                 【呈现侧】单文件兜底界面（React 构建缺失时回退）
+    ├── web/react/                     ⛔ 前端构建产物 · 由 frontend/ 编译生成，不手改
     │
     ├── radar.db                       ⛔ 运行产物 · 不进 git，路径不得移动
     ├── PROGRESS.md                    ⛔ 进度记录 · 顶部 LLM_MODE 被验收读取
     ├── CHANNELS.md                    LLM 通道实测结论
     └── BLOCKED.md                     待裁决 / 阻塞清单
+```
+
+前端（【呈现侧】· React 19 + Vite，构建产出到 `radar/web/react/`）：
+
+```
+frontend/src/
+├── main.tsx                           入口：SettingsProvider → QueryClient → Router
+├── styles/                            样式分层，加载顺序即层级，见 index.css 头注释
+│   ├── tokens.css                     ⛔ 三层令牌 · 唯一允许出现色值的地方
+│   ├── reset.css / utilities.css      归零 / 原子工具类
+│   ├── layout.css                     壳骨架：侧栏 + 顶栏 + 多标签 + 内容区
+│   ├── components.css                 全站共用组件
+│   └── motion.css                     关键帧与过渡
+├── config/setting.ts                  外观默认值与可选项的唯一来源
+├── router/
+│   ├── types.ts                       AppRouteRecord / RouteMeta
+│   ├── modules/{work,intelligence,system}.ts   ⛔ 菜单唯一真源
+│   └── index.tsx                      由 modules 生成路由表，不手写页面清单
+├── layouts/                           AppLayout + sidebar / header / worktab / settings / content
+├── components/{base,cards,forms,tables,feedback,layouts}/   Art* 组件层
+├── hooks/                             useTable / useSettings / useWorktab / useCollectStatus …
+├── api/                               接口客户端与类型（改动需与 api.py 对齐）
+└── views/{work,intelligence,system}/  页面，按业务域分组；页面私有 css 就近放
 ```
 
 ### 数据是怎么流动的
@@ -125,7 +152,7 @@ hackathon-t04/
 | | 数据侧 | 呈现侧 |
 |---|---|---|
 | 负责人 | @Haojiabin2002 | @MristYun |
-| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.md`<br>`skills.py`<br>`skills/*.md`<br>`llm.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html` |
+| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.md`<br>`skills.py`<br>`skills/*.md`<br>`llm.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html`<br>`frontend/**`<br>`DESIGN.md` |
 | 只读不改 | `db.py`、呈现侧的所有文件 | `db.py`、数据侧的所有文件 |
 | 交界面 | 往 `leads` 表**写** | 从 `leads` 表**读** |
 
@@ -136,6 +163,11 @@ hackathon-t04/
 
 **给 AI 助手的指令**：如果你发现需要修改不属于当前分支的文件，**停下来告诉用户**，
 不要自己动手。跨界修改是本项目 merge 冲突的唯一来源。
+
+**改前端前必读 `DESIGN.md`**。那份文件是设计系统的唯一来源，里面几条是硬约束：
+组件样式不许写十六进制色值和 `border-radius: Npx`（只准用 `tokens.css` 的角色层与旋钮层）；
+菜单只有 `router/modules/*` 一个来源，不许在组件里手写第二份导航数组；
+亮暗角色变量只准写两遍。这些不是风格偏好，是防止下一个人改一处漏一处。
 
 ---
 
@@ -163,7 +195,7 @@ radar/__pycache__/              编译缓存
 升版本只改那一行，OpenAPI 文档、`/api/stats` 接口、看板右上角角标三处会一起变。
 `web/index.html` 里那个硬编码的 `v0.0.1` 只是接口没通时的兜底，**不要把它当第二个版本号来维护**。
 
-当前版本：`0.5.0`
+当前版本：`0.6.0`
 
 ---
 
@@ -173,7 +205,9 @@ radar/__pycache__/              编译缓存
 
 ```bash
 # 1. 起服务（验收脚本要调接口）
-cd radar && .venv/bin/uvicorn api:app --host 127.0.0.1 --port 8000
+# 用 python -m 启动，不要用 .venv/bin/uvicorn：
+# 那个包装脚本里写死了创建时的绝对路径，项目目录一改名就 bad interpreter。
+cd radar && .venv/bin/python -m uvicorn api:app --host 127.0.0.1 --port 8000
 
 # 2. 另开一个终端跑验收
 bash radar_accept.sh

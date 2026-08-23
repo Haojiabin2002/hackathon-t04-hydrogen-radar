@@ -1,0 +1,60 @@
+/* 原子工具类 · 对齐 art-design-pro 的 flex-c / flex-cb / tad-200 命名习惯
+ * 只收高频、语义稳定的几个，不做完整原子化框架。 */
+
+.flex-c { display: flex; align-items: center; }
+.flex-b { display: flex; justify-content: space-between; }
+.flex-cc { display: flex; align-items: center; justify-content: center; }
+.flex-cb { display: flex; align-items: center; justify-content: space-between; }
+.flex-1 { flex: 1; min-width: 0; }
+
+.tad-fast { transition: all var(--dur-fast) var(--ease); }
+.tad-base { transition: all var(--dur-base) var(--ease); }
+
+.border-full-d { border: 1px solid var(--line); }
+.border-b-d { border-bottom: 1px solid var(--line); }
+.border-t-d { border-top: 1px solid var(--line); }
+
+.c-p { cursor: pointer; }
+.tnum { font-variant-numeric: tabular-nums; }
+.truncate-1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.text-muted { color: var(--muted); }
+.text-brand { color: var(--brand); }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 内容区剩余高度契约：列表页套上就不会塌陷，表格在容器内滚动 */
+.art-full-height {
+  display: flex;
+  flex-direction: column;
+  height: var(--art-full-height);
+}
+
+@media (max-width: 900px) {
+  .art-full-height { height: auto; }
+}
