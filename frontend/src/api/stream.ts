@@ -37,23 +37,51 @@ export async function postSse<T = unknown>(
   handlers: SseHandlers<T>,
   signal?: AbortSignal,
 ): Promise<void> {
-  const token = savedAdminToken();
+  async function attempt(adminToken: string): Promise<Response> {
+    try {
+      return await fetch(`${apiBaseUrl}${path}`, {
+        method: 'POST',
+        signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+          'X-Radar-Local': '1',
+          ...(adminToken ? { 'X-Radar-Admin-Token': adminToken } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') throw error;
+      throw new ApiError(0, `无法连接雷达服务：${(error as Error)?.message ?? '网络错误'}`, error);
+    }
+  }
+
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, {
-      method: 'POST',
-      signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        'X-Radar-Local': '1',
-        ...(token ? { 'X-Radar-Admin-Token': token } : {}),
-      },
-      body: JSON.stringify(body),
-    });
+    response = await attempt(savedAdminToken());
   } catch (error) {
     if ((error as Error)?.name === 'AbortError') return;
-    throw new ApiError(0, `无法连接雷达服务：${(error as Error)?.message ?? '网络错误'}`, error);
+    throw error;
+  }
+
+  // 401 补救：和 client.ts 保持同一套行为（弹口令 → 存会话 → 重发一次）。
+  // 少了这段，配了 RADAR_ADMIN_TOKEN 的线上实例上 Agent 模式会 100% 不可用，
+  // 而 README 明确承诺过"调用模型时前端会要求管理员口令"。
+  if (response.status === 401 && typeof window !== 'undefined') {
+    const supplied = window.prompt('该操作需要管理员口令。口令只保存在当前浏览器会话中。')?.trim();
+    if (supplied) {
+      try {
+        window.sessionStorage.setItem(adminTokenKey, supplied);
+      } catch {
+        // 隐私模式下存不进去，本次请求仍可完成
+      }
+      try {
+        response = await attempt(supplied);
+      } catch (error) {
+        if ((error as Error)?.name === 'AbortError') return;
+        throw error;
+      }
+    }
   }
 
   if (!response.ok) {
@@ -112,9 +140,12 @@ function dispatch<T>(frame: string, handlers: SseHandlers<T>) {
     else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
   }
   if (!dataLines.length) return;
+  let payload: T;
   try {
-    handlers.onEvent(event, JSON.parse(dataLines.join('\n')) as T);
+    payload = JSON.parse(dataLines.join('\n')) as T;
   } catch {
-    // 半帧或非 JSON：跳过，不要让一帧坏数据打断整条流
+    return;      // 半帧或非 JSON：跳过，不要让一帧坏数据打断整条流
   }
+  // onEvent 必须在 try 外调用——把消费者的异常也吞掉会让 bug 无声无息
+  handlers.onEvent(event, payload);
 }

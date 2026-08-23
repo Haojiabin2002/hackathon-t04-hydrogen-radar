@@ -70,6 +70,10 @@ function TagEditor({
 
 export default function PreferencesPage() {
   const meta = useRouteMeta();
+  // 滑块必须走本地 state：受控 + onChange 直接提交时，React 的受控还原会把
+  // 拇指弹回旧值，而 save.isPending 又会瞬间 disabled 中断拖拽——
+  // 两个效应叠加导致一次拖拽只能挪一格。提交推迟到松手。
+  const [draftScore, setDraftScore] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const prefs = useQuery({
@@ -146,12 +150,25 @@ export default function PreferencesPage() {
                   min={0}
                   max={95}
                   step={5}
-                  value={p.min_score}
-                  disabled={save.isPending}
+                  value={draftScore ?? p.min_score}
                   aria-label="最低评分"
-                  onChange={(event) => save.mutate({ key: 'min_score', value: Number(event.target.value) })}
+                  onChange={(event) => setDraftScore(Number(event.target.value))}
+                  onPointerUp={() => {
+                    if (draftScore !== null && draftScore !== p.min_score) {
+                      save.mutate({ key: 'min_score', value: draftScore });
+                    }
+                    setDraftScore(null);
+                  }}
+                  onKeyUp={() => {
+                    if (draftScore !== null && draftScore !== p.min_score) {
+                      save.mutate({ key: 'min_score', value: draftScore });
+                    }
+                    setDraftScore(null);
+                  }}
                 />
-                <b className="tnum">{p.min_score === 0 ? '不限' : `≥ ${p.min_score} 分`}</b>
+                <b className="tnum">
+                  {(draftScore ?? p.min_score) === 0 ? '不限' : `≥ ${draftScore ?? p.min_score} 分`}
+                </b>
               </div>
             </div>
 
@@ -162,11 +179,11 @@ export default function PreferencesPage() {
               </div>
               <div>
                 <input
+                  key={p.tone}
                   className="search-field"
                   aria-label="回答口吻"
                   placeholder="如 直接给结论，少铺垫"
                   defaultValue={p.tone}
-                  disabled={save.isPending}
                   onBlur={(event) => {
                     if (event.target.value !== p.tone) save.mutate({ key: 'tone', value: event.target.value });
                   }}

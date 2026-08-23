@@ -15,6 +15,7 @@
 一个不能复盘的 agent，和一个编数据的模型一样不可信。
 """
 import json
+import re
 import time
 
 import harness
@@ -22,6 +23,24 @@ import tools
 from llm import LLMUnavailable, ask
 
 MAX_STEPS = 8
+
+# 内置 API 中转「长生成偶发断连」（见 llm.py 文件头），而 agent 是多步循环——
+# 任何一步抖一下整轮就废、已完成的步骤全丢。所以在**循环层**做有限重试。
+#
+# 注意这不是降级：llm.py 仍然不重试、不切通道、不兜底。这里只做两件事——
+#   ① 瞬时故障在步边界重来一次，且**重试本身写进 trace**，界面上看得见；
+#   ② 重试用尽或遇到永久故障时，带着已完成的步骤如实收场，不编结论。
+_TRANSIENT = re.compile(
+    r"ReadTimeout|ConnectTimeout|ConnectionError|SSLError|ChunkedEncoding|"
+    r"RemoteDisconnected|Remote end closed|调用超时|API 返回 5\d\d",
+    re.I)
+
+# 配置缺失、未登录、401 这类重试一百次也一样，重试只会白烧时间和步数
+MAX_TRANSIENT_RETRIES = 2
+
+
+def _is_transient(detail: str) -> bool:
+    return bool(_TRANSIENT.search(detail))
 
 SYSTEM = """你是氢璞创能的销售研判 Agent，在「氢能商机雷达」系统里工作。
 
@@ -78,6 +97,7 @@ def run(goal, max_steps=MAX_STEPS, on_step=None):
     trace = []
     transcript = []
     proposed_action = None
+    retries = 0
 
     for step in range(1, max_steps + 1):
         prompt = base
@@ -90,8 +110,35 @@ def run(goal, max_steps=MAX_STEPS, on_step=None):
         started = time.time()
         try:
             res = ask(prompt, expect_json=True)
-        except LLMUnavailable:
-            raise
+        except LLMUnavailable as e:
+            detail = str(e)
+            if _is_transient(detail) and retries < MAX_TRANSIENT_RETRIES:
+                retries += 1
+                entry = {"step": step, "error": f"通道瞬时故障，重试（第 {retries} 次）：{detail}",
+                         "retry": True, "elapsed_s": round(time.time() - started, 1)}
+                trace.append(entry)
+                if on_step:
+                    on_step(entry)
+                transcript.append(f"[第{step}步] 模型通道瞬时故障，本步重来。")
+                continue
+            # 永久故障或重试用尽：保住已完成的步骤，如实收场
+            entry = {"step": step, "error": detail, "ok": False,
+                     "elapsed_s": round(time.time() - started, 1)}
+            trace.append(entry)
+            if on_step:
+                on_step(entry)
+            used = [x["tool"] for x in trace if x.get("tool") and x.get("ok")]
+            return {
+                "answer": (
+                    f"模型通道在第 {step} 步中断：{detail}\n\n"
+                    f"中断前完成了 {len(used)} 次工具调用"
+                    f"（{'、'.join(used) if used else '无'}），结果都在执行轨迹里。\n"
+                    f"这里不给结论——已有的检索不足以支撑一个回答。"),
+                "action": proposed_action,
+                "trace": trace,
+                "steps": step,
+                "interrupted": True,
+            }
         except ValueError as e:
             # 模型输出不是合法 JSON：记一笔并让它重来，不静默吞掉
             trace.append({"step": step, "error": f"输出非合法 JSON：{e}"})

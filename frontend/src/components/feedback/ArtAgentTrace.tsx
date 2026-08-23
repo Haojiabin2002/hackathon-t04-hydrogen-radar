@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ChevronDown, Cog, Flag, Loader2, Lock } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Cog, Flag, Loader2, Lock, RotateCcw } from 'lucide-react';
 import type { AgentStep } from '../../api/types';
 
 /**
@@ -20,18 +20,33 @@ function isGated(step: AgentStep): boolean {
   return step.ok === false && step.tool === 'trigger_collect';
 }
 
+/**
+ * 模型输出非法 JSON 的那一轮，后端只 push {step, error}——**没有 ok、没有 tool**。
+ * 只判 `ok === false` 会漏掉它（undefined === false 为假），于是被画成品牌色的成功步骤。
+ */
+function isInvalidOutput(step: AgentStep): boolean {
+  return Boolean(step.error) && !step.tool && !step.done && step.ok === undefined;
+}
+
+function isFailure(step: AgentStep): boolean {
+  if (step.retry) return false;      // 重试步是"这步重来"，不是失败
+  return (step.ok === false && !isGated(step)) || isInvalidOutput(step);
+}
+
 function StepIcon({ step, running }: { step: AgentStep; running?: boolean }) {
   if (running) return <Loader2 size={13} className="art-trace-spin" aria-hidden="true" />;
   if (step.done) return <Flag size={13} aria-hidden="true" />;
   if (isGated(step)) return <Lock size={13} aria-hidden="true" />;
-  if (step.ok === false) return <AlertTriangle size={13} aria-hidden="true" />;
+  if (step.retry) return <RotateCcw size={13} aria-hidden="true" />;
+  if (isFailure(step)) return <AlertTriangle size={13} aria-hidden="true" />;
   return <Cog size={13} aria-hidden="true" />;
 }
 
 function stepState(step: AgentStep): string {
   if (step.done) return 'is-done';
   if (isGated(step)) return 'is-gated';
-  if (step.ok === false) return 'is-failed';
+  if (step.retry) return 'is-retry';
+  if (isFailure(step)) return 'is-failed';
   return 'is-ok';
 }
 
@@ -46,9 +61,12 @@ function TraceRow({ step }: { step: AgentStep }) {
       <div className="art-trace-body">
         <div className="art-trace-head">
           <b>
-            {step.done ? '收敛' : step.tool ?? '（无工具）'}
+            {step.done ? '收敛'
+              : step.retry ? '通道抖动，本步重来'
+              : step.tool ?? (isInvalidOutput(step) ? '模型输出无效' : '（无工具）')}
             {isGated(step) && <span className="art-trace-tag is-gated">待确认</span>}
-            {step.ok === false && !isGated(step) && <span className="art-trace-tag">失败</span>}
+            {step.retry && <span className="art-trace-tag is-gated">重试</span>}
+            {isFailure(step) && <span className="art-trace-tag">失败</span>}
           </b>
           {step.elapsed_s !== undefined && <time>{step.elapsed_s}s</time>}
         </div>
@@ -60,7 +78,7 @@ function TraceRow({ step }: { step: AgentStep }) {
         )}
 
         {step.error && (
-          <p className={`art-trace-error ${isGated(step) ? 'is-gated' : ''}`}>{step.error}</p>
+          <p className={`art-trace-error ${isGated(step) || step.retry ? 'is-gated' : ''}`}>{step.error}</p>
         )}
 
         {preview && (
@@ -97,7 +115,7 @@ export function ArtAgentTrace({
   const [collapsed, setCollapsed] = useState(false);
   if (!trace.length && !running) return null;
 
-  const toolSteps = trace.filter((s) => !s.done).length;
+  const toolSteps = trace.filter((s) => s.tool).length;
 
   return (
     <section className="art-trace" aria-label="Agent 执行轨迹">
@@ -124,7 +142,7 @@ export function ArtAgentTrace({
 
       {!collapsed && (
         <ol className="art-trace-list">
-          {trace.map((step, index) => <TraceRow step={step} key={`${step.step}-${index}`} />)}
+          {trace.map((step) => <TraceRow step={step} key={step.step} />)}
           {running && (
             <li className="art-trace-step is-running">
               <span className="art-trace-marker" aria-hidden="true">

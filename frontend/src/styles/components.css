@@ -838,7 +838,8 @@
 .field textarea,
 .field select,
 .search-field,
-.composer input {
+.composer input,
+.composer textarea {
   width: 100%;
   color: var(--ink);
   background: var(--surface);
@@ -854,6 +855,7 @@
 .field textarea:focus,
 .field select:focus,
 .search-field:focus,
+.composer textarea:focus,
 .composer input:focus { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); outline: 0; }
 .field input:disabled,
 .field textarea:disabled,
@@ -1095,9 +1097,21 @@
   .filter-chip,
   .icon-btn,
   .art-tool-btn,
-  .art-page-btn { min-height: 44px; }
+  .art-page-btn,
+  /* 新增：Agent 与偏好里的小控件 */
+  .assistant-mode button,
+  .art-trace-collapse,
+  .art-trace-toggle,
+  /* 既存漏网的两个，一并补上，免得又是"改一处漏一处" */
+  .art-segmented button { min-height: 44px; }
+
   .icon-btn,
   .art-tool-btn { width: 44px; }
+
+  /* 标签上的删除键要够大才点得中 */
+  .pref-tag { height: 34px; }
+  .pref-tag button { width: 26px; height: 26px; }
+  .art-range { height: 44px; }
 }
 
 /* --------------------------------------------------- 紧凑页头（列表页用） */
@@ -1432,3 +1446,6 @@
 .art-trace-step.is-gated .art-trace-marker { color: var(--risk); background: var(--risk-soft); border-color: transparent; }
 .art-trace-tag.is-gated { color: var(--risk); background: var(--risk-soft); }
 .art-trace-error.is-gated { color: var(--risk); background: var(--risk-soft); }
+
+/* 通道抖动后的重试步：不是失败也不是成功，用琥珀 */
+.art-trace-step.is-retry .art-trace-marker { color: var(--risk); background: var(--risk-soft); border-color: transparent; }

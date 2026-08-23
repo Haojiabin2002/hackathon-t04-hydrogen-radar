@@ -39,6 +39,7 @@ export default function AssistantPage() {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [actionStatus, setActionStatus] = useState<{ messageId: string; message: string; error?: boolean } | null>(null);
+  const [agentRunning, setAgentRunning] = useState(false);
   const mode = searchParams.get('mode') === 'agent' ? 'agent' : 'chat';
   const setMode = (next: 'chat' | 'agent') => {
     const params = new URLSearchParams(searchParams);
@@ -139,7 +140,9 @@ export default function AssistantPage() {
               <div className="flex-c" style={{ gap: 8 }}>
                 <div className="assistant-mode" role="group" aria-label="助手模式">
                   <button type="button" className={mode === 'chat' ? 'is-active' : ''}
-                          aria-pressed={mode === 'chat'} onClick={() => setMode('chat')}>
+                          aria-pressed={mode === 'chat'} disabled={agentRunning}
+                          title={agentRunning ? 'Agent 正在运行，切走会丢掉整条执行轨迹' : undefined}
+                          onClick={() => setMode('chat')}>
                     <MessageSquare size={13} aria-hidden="true" />问答
                   </button>
                   <button type="button" className={mode === 'agent' ? 'is-active' : ''}
@@ -155,7 +158,7 @@ export default function AssistantPage() {
             </div>
 
             {mode === 'agent'
-              ? <AgentPanel leads={leads.data ?? []} />
+              ? <AgentPanel leads={leads.data ?? []} onRunningChange={setAgentRunning} />
               : (<>
             <div className="message-list" aria-live="polite">
               {messages.length === 0 && !chat.isPending && (

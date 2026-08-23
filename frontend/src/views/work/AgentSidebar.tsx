@@ -33,6 +33,7 @@ export function AgentSidebar() {
     mutationFn: (input: PreferenceInput) => apiMutation('/api/preferences', 'PUT', input),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['preferences'] }),
   });
+  // 没有 onError 的话，删标签失败时标签原样留着、零提示，用户以为点上了
 
   const p = prefs.data?.preferences;
   const activePrefs = p
@@ -58,7 +59,17 @@ export function AgentSidebar() {
           </Link>
         </div>
         <div className="panel-body">
-          {prefs.isLoading ? <div className="skeleton skeleton-line" /> : (
+          {savePref.isError && (
+            <div className="notice notice-error" role="alert">
+              偏好保存失败：{savePref.error instanceof Error ? savePref.error.message : '未知错误'}
+            </div>
+          )}
+          {prefs.isError && (
+            <div className="notice notice-error" role="alert">
+              偏好读取失败：{prefs.error instanceof Error ? prefs.error.message : '未知错误'}
+            </div>
+          )}
+          {prefs.isLoading ? <div className="skeleton skeleton-line" /> : prefs.isError ? null : (
             <>
               <p className="form-hint" style={{ marginBottom: 8 }}>
                 <b>偏好</b>
@@ -107,6 +118,11 @@ export function AgentSidebar() {
         </div>
         <div className="panel-body">
           {tools.isLoading && <div className="skeleton skeleton-line" />}
+          {tools.isError && (
+            <div className="notice notice-error" role="alert">
+              工具目录读取失败：{tools.error instanceof Error ? tools.error.message : '未知错误'}
+            </div>
+          )}
           {(tools.data?.tools ?? []).map((tool) => (
             <div className="source-row" key={tool.name}>
               <div className="source-row-head">

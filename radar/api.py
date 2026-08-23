@@ -1119,17 +1119,22 @@ def run_agent(body: AgentIn, request: Request):
 
 
 @app.post("/api/agent/stream")
-def run_agent_stream(body: AgentIn, request: Request):
+async def run_agent_stream(body: AgentIn, request: Request):
     """Agent 循环的流式版本（SSE）。
 
     一次 agent 调用要跑 1-3 分钟。非流式接口会让用户对着空白等两分钟，
     既不知道它在干什么，也不知道是不是卡死了。所以把 agent.run 的 on_step
-    回调桥接成 SSE：每完成一步就推一条，前端可以实时画出执行轨迹。
+    回调桥接成 SSE：每完成一步就推一条，前端实时画出执行轨迹。
 
-    事件：
-      event: step   每一步（含 thought / tool / args / ok / result_preview）
-      event: done   收敛（含 answer / action / trace / steps）
-      event: error  失败（含 detail）
+    **取消**：客户端断开后必须真把后端停下来。少了这一步，用户点「停止」
+    只停了前端，worker 会跑完剩余步数、继续烧模型额度；而 remember /
+    set_preference 这两个工具是 confirm=False 的，会继续往
+    ~/.config/hydrogen-radar/ 写盘。界面那句「已停止」就成了不实陈述。
+    做法：on_step 里检查取消位并抛异常——agent.run 调 on_step 时不在 try 内，
+    异常会穿出来被下面的 except 接住，于是在**步边界**干净停住。
+
+    事件：step / done / error，外加空闲时的 `: keepalive` 心跳
+    （首次模型调用要几十秒，没有心跳中间层可能把连接掐掉）。
     """
     _guard_local(request)
     goal = (body.goal or "").strip()
@@ -1138,28 +1143,55 @@ def run_agent_stream(body: AgentIn, request: Request):
 
     import queue
     import threading
+    import traceback
+
+    import anyio.to_thread
 
     steps = max(1, min(int(body.max_steps or 8), 12))
     q: "queue.Queue[tuple[str, object]]" = queue.Queue()
+    cancel = threading.Event()
+
+    class _Cancelled(Exception):
+        pass
+
+    def on_step(entry):
+        q.put(("step", entry))
+        if cancel.is_set():
+            raise _Cancelled("客户端已断开")
 
     def worker():
         try:
             import agent as ag
-            out = ag.run(goal, max_steps=steps, on_step=lambda e: q.put(("step", e)))
-            q.put(("done", out))
-        except Exception as e:            # 包含 LLMUnavailable
+            q.put(("done", ag.run(goal, max_steps=steps, on_step=on_step)))
+        except _Cancelled:
+            pass                       # 正常取消，不当错误上报
+        except Exception as e:         # 含 LLMUnavailable
+            # 客户端已断开时下面这条消息没人读，所以必须同时落服务端日志——
+            # 否则通道不通在这条路径上零记录（CLAUDE.md 第四节）。
+            traceback.print_exc()
             q.put(("error", {"detail": f"{type(e).__name__}: {e}"}))
         finally:
             q.put(("__end__", None))
 
     threading.Thread(target=worker, daemon=True).start()
 
-    def events():
-        while True:
-            kind, payload = q.get()
-            if kind == "__end__":
-                return
-            yield f"event: {kind}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+    async def events():
+        try:
+            while True:
+                try:
+                    kind, payload = await anyio.to_thread.run_sync(
+                        lambda: q.get(timeout=1.0))
+                except queue.Empty:
+                    if await request.is_disconnected():
+                        cancel.set()
+                        return
+                    yield ": keepalive\n\n"
+                    continue
+                if kind == "__end__":
+                    return
+                yield f"event: {kind}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        finally:
+            cancel.set()               # 生成器被关闭（客户端断开）也要停 worker
 
     return StreamingResponse(events(), media_type="text/event-stream", headers={
         "Cache-Control": "no-store",

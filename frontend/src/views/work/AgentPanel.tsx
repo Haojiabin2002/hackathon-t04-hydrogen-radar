@@ -57,12 +57,17 @@ const PRESET_GOALS = [
   '当前漏斗哪一步损耗最大？给出可执行的改进建议',
 ];
 
-export function AgentPanel({ leads }: { leads: Lead[] }) {
+export function AgentPanel({ leads, onRunningChange }: {
+  leads: Lead[];
+  /** 把运行状态报给外层，好让它在跑的时候禁掉模式切换 */
+  onRunningChange?: (running: boolean) => void;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [goal, setGoal] = useState('');
   const [run, setRun] = useState<AgentRun | null>(null);
-  const [tick, setTick] = useState(0);
+  // 只为让 liveSeconds 每秒重算，值本身不读——所以丢掉 getter
+  const [, forceTick] = useState(0);
   const [actionStatus, setActionStatus] = useState<{ message: string; error?: boolean } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -76,15 +81,21 @@ export function AgentPanel({ leads }: { leads: Lead[] }) {
   // 跑起来后每秒刷一次，让计时器动起来（后端不给百分比，只给真实耗时）
   useEffect(() => {
     if (run?.status !== 'running') return;
-    const timer = window.setInterval(() => setTick((v) => v + 1), 1000);
+    const timer = window.setInterval(() => forceTick((v) => v + 1), 1000);
     return () => window.clearInterval(timer);
   }, [run?.status]);
 
+  // 只在真有新步骤时滚动。把 tick 放进依赖会导致运行中每秒强制滚到底，
+  // 用户想往上翻看第 2 步的返回值都翻不了。
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [run?.trace.length, run?.status, tick]);
+  }, [run?.trace.length, run?.status]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  const running = run?.status === 'running';
+  useEffect(() => { onRunningChange?.(running); }, [running, onRunningChange]);
+  useEffect(() => () => onRunningChange?.(false), [onRunningChange]);
 
   const start = useCallback(async (rawGoal: string) => {
     const clean = rawGoal.trim();
@@ -114,30 +125,40 @@ export function AgentPanel({ leads }: { leads: Lead[] }) {
               void queryClient.invalidateQueries({ queryKey: ['preferences'] });
             } else if (event === 'error') {
               const detail = (data as { detail: string })?.detail ?? '未知错误';
-              setRun((cur) => cur ? { ...cur, status: 'error', error: detail } : cur);
+              setRun((cur) => cur ? { ...cur, status: 'error', error: detail,
+                elapsed: (Date.now() - cur.startedAt) / 1000 } : cur);
             }
           },
         },
         controller.signal,
       );
+      // 流正常结束却没收到 done/error：连接被干净截断了。
+      // 不收这个尾，run 会永远停在 running，输入框和按钮永久禁用。
+      setRun((cur) => cur?.status === 'running'
+        ? { ...cur, status: 'error', elapsed: (Date.now() - cur.startedAt) / 1000,
+            error: '连接中断，未收到结论' }
+        : cur);
     } catch (error) {
       if (controller.signal.aborted) return;
       setRun((cur) => cur ? {
         ...cur, status: 'error',
         error: error instanceof Error ? error.message : '请求失败',
+        elapsed: (Date.now() - cur.startedAt) / 1000,
       } : cur);
     }
   }, [queryClient]);
 
   const stop = () => {
     abortRef.current?.abort();
-    setRun((cur) => cur ? { ...cur, status: 'aborted' } : cur);
+    setRun((cur) => cur ? { ...cur, status: 'aborted',
+      elapsed: (Date.now() - cur.startedAt) / 1000 } : cur);
   };
 
   const runAction = useMutation({
     mutationFn: async (action: ChatAction) => {
       if (action.type === 'collect') {
         const r = await apiMutation<CollectStartResult>('/api/collect', 'POST');
+        void queryClient.invalidateQueries({ queryKey: ['collect-status'] });
         return { message: r.started ? '真实采集已启动，可在顶栏运行面板查看。' : `未启动：${r.reason || '后端未给出原因'}` };
       }
       if (action.type === 'open_lead') {
@@ -163,9 +184,12 @@ export function AgentPanel({ leads }: { leads: Lead[] }) {
     void start(goal);
   };
 
-  const running = run?.status === 'running';
   const liveSeconds = run ? (Date.now() - run.startedAt) / 1000 : 0;
   const confirmTools = tools.data?.tools.filter((t) => t.requires_confirm) ?? [];
+  // 会改写本地状态的工具从接口推，不要在 JSX 里写死名字——REGISTRY 一改就过期
+  const writingTools = (tools.data?.tools ?? [])
+    .filter((t) => !t.requires_confirm && /^(remember|set_preference)$/.test(t.name))
+    .map((t) => t.name);
 
   return (
     <>
@@ -174,8 +198,9 @@ export function AgentPanel({ leads }: { leads: Lead[] }) {
         <span>
           Agent 有 {tools.data?.tools.length ?? '—'} 个工具，全部由后端代码执行，模型碰不到文件系统、shell 或网络。
           {confirmTools.length > 0 && <>　<b>{confirmTools.map((t) => t.name).join('、')}</b> 需你确认后才执行；</>}
-          　其余工具会直接执行，其中 <b>remember</b>、<b>set_preference</b> 会改写你的记忆与偏好——
-          执行轨迹里能看到它调没调。
+          {writingTools.length > 0 && (
+            <>　其余工具直接执行，其中 <b>{writingTools.join('、')}</b> 会改写你的记忆与偏好——执行轨迹里能看到它调没调。</>
+          )}
         </span>
       </div>
 
@@ -200,7 +225,7 @@ export function AgentPanel({ leads }: { leads: Lead[] }) {
             />
 
             {running && (
-              <div className="notice" role="status">
+              <div className="notice tnum" role="status">
                 已运行 {liveSeconds.toFixed(0)} 秒 · 最多 8 步
                 <button type="button" className="btn btn-link" onClick={stop}>
                   <CircleStop size={13} aria-hidden="true" />停止
@@ -210,7 +235,7 @@ export function AgentPanel({ leads }: { leads: Lead[] }) {
 
             {run.status === 'aborted' && (
               <div className="notice notice-warning" role="status">
-                已停止。上面是中止前真实完成的步骤，没有结论。
+                已停止。后端会在当前这一步结束后停下——上面是已真实完成的步骤，没有结论。
               </div>
             )}
 
@@ -228,6 +253,11 @@ export function AgentPanel({ leads }: { leads: Lead[] }) {
                 {run.result.exhausted && (
                   <div className="notice notice-warning">
                     步数用完仍未收敛——下面不是结论，是如实说明。
+                  </div>
+                )}
+                {run.result.interrupted && (
+                  <div className="notice notice-warning">
+                    模型通道中断，已完成的步骤保留在上方轨迹里——下面不是结论。
                   </div>
                 )}
                 <CitedAnswer text={run.result.answer} leads={leads} />

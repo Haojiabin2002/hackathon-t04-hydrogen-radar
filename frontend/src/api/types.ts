@@ -356,6 +356,8 @@ export interface AgentStep {
   /** 工具失败或模型输出不合法时的原因 */
   error?: string;
   done?: boolean;
+  /** 通道瞬时故障后的重试步。不是失败，是同一步重来一次 */
+  retry?: boolean;
   elapsed_s?: number;
 }
 
@@ -366,6 +368,8 @@ export interface AgentResult {
   steps: number;
   /** 步数耗尽仍未收敛。此时 answer 是如实说明，不是结论。 */
   exhausted?: boolean;
+  /** 模型通道中断。answer 说明中断原因，已完成的步骤保留在 trace 里。 */
+  interrupted?: boolean;
 }
 
 export interface AgentInput {
