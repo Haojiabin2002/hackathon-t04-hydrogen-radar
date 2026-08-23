@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Atom, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { routeGroups } from '../../router/modules';
 import { useSettings } from '../../hooks/useSettings';
 import { useCollectStatus } from '../../hooks/useCollectStatus';
@@ -16,7 +16,9 @@ export function ArtSidebarMenu() {
   return (
     <div className="sidebar">
       <NavLink className="sidebar-brand" to="/" aria-label="氢能商机雷达首页">
-        <span className="sidebar-brand-mark"><span>H</span><sub>2</sub></span>
+        <span className="sidebar-brand-mark">
+          <Atom size={20} strokeWidth={2} aria-hidden="true" />
+        </span>
         <span className="sidebar-brand-copy">
           <strong>氢能商机雷达</strong>
           <small>v{stats.data?.version ?? '—'}</small>

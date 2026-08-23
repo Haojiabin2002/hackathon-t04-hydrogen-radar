@@ -1276,6 +1276,14 @@ def react_spa(path: str):
     if path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API 路由不存在")
 
+    # 构建根目录下的真实静态文件（favicon.svg 等）先直接返回。
+    # 只有 /assets/* 是独立静态挂载，根目录文件不特判就会被 SPA 兜底吞成 index.html。
+    # 限制为"不含斜杠、不以点开头"的单段文件名，路径无法逃出 REACT_WEB。
+    if path and "/" not in path and not path.startswith("."):
+        static_file = REACT_WEB / path
+        if static_file.is_file():
+            return FileResponse(static_file)
+
     entry = REACT_WEB / "index.html"
     if entry.is_file():
         return FileResponse(entry)

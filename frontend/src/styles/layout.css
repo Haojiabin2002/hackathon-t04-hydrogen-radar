@@ -50,22 +50,14 @@
 }
 
 .sidebar-brand-mark {
-  display: flex;
+  display: grid;
   flex-shrink: 0;
-  align-items: baseline;
-  justify-content: center;
+  place-items: center;
   width: 34px;
   height: 34px;
   color: var(--brand-on);
-  font-weight: 700;
-  font-size: 15px;
   background: var(--brand);
   border-radius: var(--radius-control);
-}
-
-.sidebar-brand-mark sub {
-  font-size: 10px;
-  line-height: 1;
 }
 
 .sidebar-brand-copy {
