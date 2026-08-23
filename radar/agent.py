@@ -1,0 +1,188 @@
+"""氢能商机雷达 · Agent 循环。
+
+与 pipeline.py 的区别：
+  pipeline.py 是 **workflow** —— 代码写死 抽取→归并→匹配→出卡，模型只在固定点被调用。
+  agent.py 是 **agent** —— 给定一个目标，由模型自己决定调哪个工具、调几次、何时收敛。
+
+协议用 JSON 而非原生 function calling：我们的通道是 CLI 子进程（工具已被全部禁用），
+拿不到原生工具调用。模型每轮输出一个动作对象，我们的代码执行后把观察喂回去。
+这样任何通道都能跑，也不需要把工具能力还给子进程。
+
+结构参考 pi（earendil-works/pi, MIT）与 deepseek-harness（deepseek-ai, MIT）：
+技能与知识以目录形式进 system prompt，正文按需用工具取——渐进披露。
+
+每一步都记进 trace，界面要能看到 agent 到底做了什么。
+一个不能复盘的 agent，和一个编数据的模型一样不可信。
+"""
+import json
+import time
+
+import harness
+import tools
+from llm import LLMUnavailable, ask
+
+MAX_STEPS = 8
+
+SYSTEM = """你是氢璞创能的销售研判 Agent，在「氢能商机雷达」系统里工作。
+
+氢璞创能做燃料电池电堆与制氢装备。你的职责是基于**系统里已有的真实数据**回答销售的问题、
+给出可执行的判断。你没有文件系统、没有 shell、不能上网——只能通过下面的工具访问本系统的数据。
+
+{harness_context}
+
+{tool_catalog}
+
+工作方式：
+1. 先想清楚要回答什么，缺哪些事实。
+2. 一次调一个工具补齐事实。不要凭记忆猜数字——数字一律用 get_stats / search_leads 取。
+3. 事实够了就收敛，给出结论。
+
+铁律：
+- **不许编造**。工具没返回的东西就是不知道，直说"系统里没有"，不要补全。
+- 引用线索必须带 #ID，方便销售点开核对。
+- 涉及具体公告事实时，优先用 get_lead 拿原文摘录核对，不要只依赖评分理由。
+- 区分「公告实证」与「系统推断」：线索里 region_trace / company_trace 为 inferred 的字段
+  是模型推断的，不是公告写的，引用时必须标明。
+- trigger_collect 你不能自己执行，只能在 action 里提议。
+
+每一轮**只输出一个 JSON 对象**，不要额外文字、不要代码块包裹：
+
+调用工具：
+{{"thought": "为什么要调这个", "tool": "工具名", "args": {{...}}}}
+
+给出最终答复：
+{{"thought": "收敛理由", "done": true, "answer": "给销售看的回答", "action": null}}
+
+action 可选，用于建议界面执行一个动作，只允许：
+  {{"type":"open_lead","id":13}} / {{"type":"filter_board","filter":"high"}} / {{"type":"collect"}}
+不需要就填 null。
+
+目标：{goal}
+"""
+
+
+def run(goal, max_steps=MAX_STEPS, on_step=None):
+    """跑一轮 agent。返回 {answer, action, trace, steps}。
+
+    on_step: 可选回调，每步执行完调用一次，用于流式展示。
+    """
+    goal = str(goal or "").strip()
+    if not goal:
+        raise ValueError("目标为空")
+
+    base = SYSTEM.format(
+        harness_context=harness.context_block(),
+        tool_catalog=tools.catalog_block(),
+        goal=goal[:600],
+    )
+    trace = []
+    transcript = []
+    proposed_action = None
+
+    for step in range(1, max_steps + 1):
+        prompt = base
+        if transcript:
+            prompt += "\n\n已经做过的事（按顺序）：\n" + "\n".join(transcript)
+            prompt += f"\n\n这是第 {step} 步，最多 {max_steps} 步。"
+            if step >= max_steps:
+                prompt += "\n**这是最后一步，必须输出 done:true 收敛。**"
+
+        started = time.time()
+        try:
+            res = ask(prompt, expect_json=True)
+        except LLMUnavailable:
+            raise
+        except ValueError as e:
+            # 模型输出不是合法 JSON：记一笔并让它重来，不静默吞掉
+            trace.append({"step": step, "error": f"输出非合法 JSON：{e}"})
+            transcript.append(f"[第{step}步] 你的输出不是合法 JSON，请严格只输出一个 JSON 对象。")
+            continue
+
+        if not isinstance(res, dict):
+            trace.append({"step": step, "error": "输出不是对象"})
+            transcript.append(f"[第{step}步] 输出必须是 JSON 对象。")
+            continue
+
+        thought = str(res.get("thought") or "")[:400]
+
+        # —— 收敛 ——
+        if res.get("done"):
+            answer = str(res.get("answer") or "").strip()
+            if not answer:
+                transcript.append(f"[第{step}步] done 了但 answer 是空的，请给出真正的回答。")
+                continue
+            action = _clean_action(res.get("action")) or proposed_action
+            trace.append({"step": step, "thought": thought, "done": True,
+                          "elapsed_s": round(time.time() - started, 1)})
+            if on_step:
+                on_step(trace[-1])
+            return {"answer": answer, "action": action, "trace": trace, "steps": step}
+
+        # —— 调工具 ——
+        name = str(res.get("tool") or "")
+        args = res.get("args") if isinstance(res.get("args"), dict) else {}
+        if not name:
+            transcript.append(f"[第{step}步] 既没有 done 也没有 tool，请二选一。")
+            continue
+
+        out = tools.execute(name, args)
+        if name == "trigger_collect":
+            proposed_action = {"type": "collect"}
+
+        entry = {"step": step, "thought": thought, "tool": name, "args": args,
+                 "ok": out.get("ok", False), "elapsed_s": round(time.time() - started, 1)}
+        if out.get("ok"):
+            payload = json.dumps(out["result"], ensure_ascii=False)
+            entry["result_preview"] = payload[:600]
+        else:
+            entry["error"] = out.get("error")
+            payload = f"失败：{out.get('error')}"
+        trace.append(entry)
+        if on_step:
+            on_step(entry)
+
+        transcript.append(
+            f"[第{step}步] 调用 {name}({json.dumps(args, ensure_ascii=False)})\n"
+            f"        结果：{payload[:1200]}")
+
+    # 步数用完还没收敛，如实报告，不编一个结论出来
+    return {
+        "answer": f"在 {max_steps} 步内没有收敛出结论。已完成的检索见执行轨迹，"
+                  f"可以把问题问得更具体一些再试。",
+        "action": proposed_action, "trace": trace, "steps": max_steps, "exhausted": True,
+    }
+
+
+_ACTIONS = {"open_lead", "filter_board", "collect"}
+_FILTERS = {"all", "high", "mid", "sea", "card", "rej"}
+
+
+def _clean_action(a):
+    if not isinstance(a, dict):
+        return None
+    t = a.get("type")
+    if t not in _ACTIONS:
+        return None
+    if t == "collect":
+        return {"type": "collect"}
+    if t == "open_lead":
+        try:
+            return {"type": "open_lead", "id": int(a.get("id"))}
+        except (TypeError, ValueError):
+            return None
+    f = a.get("filter")
+    return {"type": "filter_board", "filter": f} if f in _FILTERS else None
+
+
+if __name__ == "__main__":
+    import sys
+    goal = " ".join(sys.argv[1:]) or "现在最值得今天打电话的三条线索是哪几条？为什么？"
+    print(f"目标：{goal}\n" + "=" * 60)
+    out = run(goal, on_step=lambda e: print(
+        f"  [{e['step']}] {e.get('tool','收敛')} "
+        f"{'✓' if e.get('ok') or e.get('done') else '✗ ' + str(e.get('error',''))[:60]}"
+        f"  {e.get('elapsed_s')}s"))
+    print("=" * 60)
+    print(out["answer"])
+    if out.get("action"):
+        print(f"\n[动作提案] {out['action']}")

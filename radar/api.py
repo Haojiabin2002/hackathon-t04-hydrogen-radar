@@ -1077,6 +1077,73 @@ class ChatIn(BaseModel):
     question: str
 
 
+class AgentIn(BaseModel):
+    goal: str
+    max_steps: int | None = None
+
+
+class PreferenceIn(BaseModel):
+    key: str
+    value: object
+
+
+
+@app.post("/api/agent")
+def run_agent(body: AgentIn, request: Request):
+    """Agent 循环：给一个目标，模型自己决定调哪些工具、调几次、何时收敛。
+
+    与 /api/chat 的区别：chat 是单次调用返回一段话；agent 是多步循环，
+    返回里带完整执行轨迹（trace），界面要把每一步展示出来——
+    一个不能复盘的 agent 不可信。
+    """
+    _guard_local(request)          # agent 会真实消耗模型额度，按写操作对待
+    goal = (body.goal or "").strip()
+    if not goal:
+        raise HTTPException(status_code=400, detail="goal 不能为空")
+    try:
+        import agent as ag
+        from llm import LLMUnavailable
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Agent 模块不可用：{e}")
+    steps = body.max_steps if body.max_steps else ag.MAX_STEPS
+    steps = max(1, min(int(steps), 12))
+    try:
+        return ag.run(goal, max_steps=steps)
+    except LLMUnavailable as e:
+        raise HTTPException(status_code=503, detail=f"LLM 通道不可用：{e}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+
+
+@app.get("/api/agent/tools")
+def agent_tools():
+    """工具目录，供界面展示 agent 能做什么。"""
+    import tools as tl
+    return {"tools": [
+        {"name": n, "description": s["desc"], "args": s["args"], "requires_confirm": s["confirm"]}
+        for n, s in tl.REGISTRY.items()
+    ]}
+
+
+@app.get("/api/preferences")
+def get_preferences():
+    import harness as hz
+    return {"preferences": hz.read_prefs(),
+            "schema": {k: v["desc"] for k, v in hz.PREF_SCHEMA.items()}}
+
+
+@app.put("/api/preferences")
+def put_preference(body: PreferenceIn, request: Request):
+    _guard_local(request)
+    import harness as hz
+    try:
+        return hz.set_preference(body.key, body.value)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/api/chat")
 def chat(body: ChatIn):
     """对话面板后端。通道不通时返回 503 并说明原因——不使用任何预置应答。
