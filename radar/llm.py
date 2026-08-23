@@ -51,6 +51,36 @@ CHANNEL_NAMES = {
 }
 DEFAULT_CHANNEL = "claude_cli"
 
+# ---------- 内置 API 通道（内部演示用） ----------
+# 目的：clone 仓库或部署到 Railway 后，无需任何手工配置就能跑通全链路。
+#
+# ⚠️ 这里的 API Key 会随仓库进入 git 历史，删除需要重写历史。
+#    当前仓库是私有的（MristYun/hackathon-t04-hydrogen-radar，PRIVATE），
+#    协作者与拿到仓库访问权的评委可以看到。演示结束后请轮换密钥。
+#
+# 覆盖顺序（见 load_config）：
+#     内置默认  <  ~/.config/hydrogen-radar/llm.json  <  RADAR_LLM_* 环境变量
+# 所以线上要换 key，设 RADAR_LLM_API_KEY 就行，不必改代码、不必重新构建镜像。
+#
+# 关于模型选择：接入点 api.openai-next.com 上账号可见约 650 个模型，
+# 但**账号可见不等于可用**。实测冒烟通过的只有 claude-opus-5 / claude-opus-4-8 /
+# claude-opus-4-7-thinking / claude-sonnet-5 四个。选 sonnet-5 是因为它中文抽取
+# 与严格 JSON 输出都稳，且比 opus 便宜。换别的模型前请先用「模型通道」页测一次。
+#
+# 已知的两个端点脾气：
+#   · 该中转拿不到扩展思考——reasoning_effort / thinking 会被静默接受但无效果，
+#     所以不要在提示词里指望思考预算。
+#   · 长生成偶发断连（ReadTimeout / SSLError）。本模块**不做自动重试**，
+#     失败即抛 LLMUnavailable 如实上报，符合项目「不降级、不兜底」的规矩。
+BUILTIN_API = {
+    # 必须带 /v1：_ask_api 的 openai 分支只补 "/chat/completions"，
+    # 少这一段会打到不存在的路径拿 404，然后被误判成「key 失效」。
+    "base_url": "https://api.openai-next.com/v1",
+    "model": "claude-sonnet-5",
+    "api_key": "REMOVED_HISTORICAL_API_KEY",
+    "style": "openai",
+}
+
 # 钉死模型：不钉的话，账号默认模型一变，打分口径和 JSON 行为会跟着悄悄变，
 # 提交前最后一次验收就可能不可复现。换模型必须是显式动作（改这里或设环境变量）。
 CLAUDE_MODEL = os.environ.get("RADAR_LLM_CLAUDE_MODEL", "claude-opus-5")
@@ -210,7 +240,14 @@ def _ask_api(prompt, cfg, timeout=TIMEOUT):
 
     style = _api_style(base, cfg.get("style", ""))
     if style == "anthropic":
-        url = base + ("" if base.endswith("/v1/messages") else "/v1/messages")
+        # 两种 base 都要能接：带 /v1 的只补 /messages，不带的补 /v1/messages。
+        # openai 分支假定 base 含 /v1，这里若不对齐就会拼出 /v1/v1/messages。
+        if base.endswith("/v1/messages"):
+            url = base
+        elif base.endswith("/v1"):
+            url = base + "/messages"
+        else:
+            url = base + "/v1/messages"
         headers = {"x-api-key": key, "anthropic-version": "2023-06-01",
                    "content-type": "application/json"}
         payload = {"model": model, "max_tokens": 4096,
@@ -247,8 +284,10 @@ def _ask_api(prompt, cfg, timeout=TIMEOUT):
 # ---------- 配置读写 ----------
 
 def _blank_config():
-    return {"channel": DEFAULT_CHANNEL,
-            "api": {"base_url": "", "model": "", "api_key": "", "style": ""}}
+    """配置底座。内置 API 通道可用时，默认通道直接就是 api——
+    这样新机器 clone 下来不配置也能跑，不必先去登录 claude CLI。"""
+    api = dict(BUILTIN_API)
+    return {"channel": "api" if api.get("api_key") else DEFAULT_CHANNEL, "api": api}
 
 
 def load_config():
@@ -261,8 +300,11 @@ def load_config():
             if disk.get("channel") in CHANNELS:
                 cfg["channel"] = disk["channel"]
             if isinstance(disk.get("api"), dict):
+                # 只覆盖非空值：save_config 总是把四个字段全写下来，
+                # 之前配过 CLI 通道的机器磁盘里 api_key 是空串，
+                # 照单覆盖会把内置默认抹成空，于是 api 通道又不可用了。
                 cfg["api"].update({k: v for k, v in disk["api"].items()
-                                   if k in cfg["api"] and isinstance(v, str)})
+                                   if k in cfg["api"] and isinstance(v, str) and v})
     except (OSError, ValueError):
         pass
 
