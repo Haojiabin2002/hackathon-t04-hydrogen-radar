@@ -1,32 +1,25 @@
-import { useMemo, useState } from 'react';
-import { ArrowRight, ExternalLink, SignalZero } from 'lucide-react';
+import { useMemo } from 'react';
+import { ArrowRight, ExternalLink, SignalZero, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiGet } from '../../api/client';
 import type { Lead } from '../../api/types';
 import { useTable, type TableColumn, type TableFilter } from '../../hooks/useTable';
 import { useRouteMeta } from '../../hooks/useRouteMeta';
 import { ArtPageHead } from '../../components/cards/ArtPageHead';
-import { ArtSearchBar } from '../../components/forms/ArtSearchBar';
+import { ArtFilterChips } from '../../components/forms/ArtFilterChips';
 import { ArtPagination } from '../../components/forms/ArtPagination';
 import { ArtTable } from '../../components/tables/ArtTable';
 import { ArtTableHeader } from '../../components/tables/ArtTableHeader';
 import { ArtEmpty, ArtError, ArtLoading } from '../../components/feedback/ArtStates';
 
 const FILTERS: Array<TableFilter<Lead>> = [
-  { key: 'all', label: '全部在研', test: (lead) => lead.status !== 'rejected' },
+  { key: 'all', label: '在研', test: (lead) => lead.status !== 'rejected' },
   { key: 'high', label: '高分 ≥80', test: (lead) => lead.status !== 'rejected' && (lead.score ?? 0) >= 80 },
   { key: 'mid', label: '中分 60–79', test: (lead) => lead.status !== 'rejected' && (lead.score ?? 0) >= 60 && (lead.score ?? 0) < 80 },
   { key: 'sea', label: '海外', test: (lead) => lead.status !== 'rejected' && lead.overseas },
   { key: 'card', label: '有作战卡', test: (lead) => lead.status !== 'rejected' && Boolean(lead.has_card) },
   { key: 'rej', label: '判非商机', test: (lead) => lead.status === 'rejected' },
 ];
-
-const METRICS = [
-  { key: 'all', label: '在研线索', note: '进入销售判断的线索' },
-  { key: 'high', label: '高价值', note: '评分不低于 80' },
-  { key: 'sea', label: '海外线索', note: '来自海外配置源' },
-  { key: 'card', label: '有作战卡', note: '已有可执行材料' },
-] as const;
 
 function scoreBadge(lead: Lead) {
   if (lead.status === 'rejected') return 'badge-neutral';
@@ -124,7 +117,6 @@ const columns: Array<TableColumn<Lead>> = [
 
 export default function OpportunitiesPage() {
   const meta = useRouteMeta();
-  const [searchOpen, setSearchOpen] = useState(false);
 
   const searchFields = useMemo(
     () => (lead: Lead) => [
@@ -168,7 +160,7 @@ export default function OpportunitiesPage() {
     );
   }
 
-  const activeFilterLabel = FILTERS.find((item) => item.key === table.activeFilter)?.label ?? '全部在研';
+  const activeFilterLabel = FILTERS.find((item) => item.key === table.activeFilter)?.label ?? '在研';
 
   return (
     <section className="page art-full-height">
@@ -179,54 +171,44 @@ export default function OpportunitiesPage() {
         actions={<Link className="btn btn-quiet" to="/assistant">询问研判助手<ArrowRight size={15} /></Link>}
       />
 
-      <div className="metric-grid" aria-label="商机分组">
-        {METRICS.map((item) => {
-          const filter = FILTERS.find(({ key }) => key === item.key)!;
-          return (
-            <Link
-              className={`metric-card ${table.activeFilter === item.key ? 'is-accent' : ''}`}
-              key={item.key}
-              to={item.key === 'all' ? '/opportunities' : `/opportunities?filter=${item.key}`}
-            >
-              <span>{item.label}</span>
-              <strong>{table.allRows.filter(filter.test).length}</strong>
-              <small>{item.note}</small>
-            </Link>
-          );
-        })}
-      </div>
-
-      <ArtSearchBar
-        open={searchOpen}
-        keyword={table.keyword}
-        onSearch={table.setKeyword}
-        onReset={() => table.setActiveFilter(FILTERS[0].key)}
-        placeholder="搜索主体、地区、行业、产品…"
-      />
-
       <div className="art-table-card">
         <div className="art-table-card-body">
           <ArtTableHeader
+            search={{
+              value: table.keyword,
+              onChange: table.setKeyword,
+              placeholder: '搜索主体、地区、行业、产品…',
+              label: '搜索商机主体、地区、行业或产品',
+            }}
             left={
-              <div className="toolbar-group" role="group" aria-label="快速筛选">
-                {FILTERS.map((filter) => (
-                  <button
-                    key={filter.key}
-                    type="button"
-                    className={`filter-chip ${filter.key === table.activeFilter ? 'is-active' : ''}`}
-                    aria-pressed={filter.key === table.activeFilter}
-                    onClick={() => table.setActiveFilter(filter.key)}
-                  >
-                    {filter.label}（{table.allRows.filter(filter.test).length}）
-                  </button>
-                ))}
-              </div>
+              <ArtFilterChips
+                label="商机筛选"
+                filters={FILTERS}
+                counts={table.filterCounts}
+                active={table.activeFilter}
+                onChange={table.setActiveFilter}
+                separateLast
+              />
             }
-            count={`${activeFilterLabel} ${table.total} / ${table.allRows.length} 条`}
+            status={
+              <>
+                <span>
+                  {table.keyword && table.total !== table.scopeTotal
+                    ? `${activeFilterLabel} 共 ${table.scopeTotal} 条，关键词命中 ${table.total} 条`
+                    : `${activeFilterLabel} ${table.total} 条`}
+                </span>
+                {table.keyword && (
+                  <span className="art-active-keyword">
+                    关键词「{table.keyword}」
+                    <button type="button" aria-label="清除关键词" onClick={() => table.setKeyword('')}>
+                      <X size={12} aria-hidden="true" />
+                    </button>
+                  </span>
+                )}
+              </>
+            }
             loading={table.isFetching}
             onRefresh={() => void table.refetch()}
-            searchOpen={searchOpen}
-            onToggleSearch={() => setSearchOpen((value) => !value)}
             columns={table.columns}
             hiddenColumns={table.hiddenColumns}
             onToggleColumn={table.toggleColumn}
@@ -238,7 +220,9 @@ export default function OpportunitiesPage() {
             rowKey={(lead) => lead.id}
             sort={table.sort}
             onToggleSort={table.toggleSort}
-            emptyContent="真实数据仍然保留，只是被当前筛选或搜索词隐藏。"
+            emptyContent={table.keyword
+              ? `「${table.keyword}」在${activeFilterLabel}范围内没有命中，真实数据仍然保留。`
+              : '该筛选范围内暂无记录，真实数据仍然保留。'}
           />
 
           <ArtPagination

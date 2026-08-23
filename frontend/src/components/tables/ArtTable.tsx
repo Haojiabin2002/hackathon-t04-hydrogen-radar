@@ -33,19 +33,22 @@ export function ArtTable<T>({
                 <th
                   key={column.key}
                   style={{ width: column.width, textAlign: column.align }}
-                  className={sortable ? 'is-sortable' : undefined}
                   aria-sort={active ? (sort.desc ? 'descending' : 'ascending') : undefined}
-                  onClick={sortable ? () => onToggleSort(column.key) : undefined}
                 >
                   {sortable ? (
-                    <span className="art-table-sort">
+                    // 排序必须是真正的 button：<th onClick> 鼠标能点，键盘完全够不到
+                    <button
+                      type="button"
+                      className="art-table-sort"
+                      onClick={() => onToggleSort(column.key)}
+                    >
                       {column.label}
                       {active
                         ? (sort.desc
                           ? <ArrowDown size={12} aria-hidden="true" />
                           : <ArrowUp size={12} aria-hidden="true" />)
                         : <ChevronsUpDown size={12} aria-hidden="true" opacity={0.5} />}
-                    </span>
+                    </button>
                   ) : column.label}
                 </th>
               );

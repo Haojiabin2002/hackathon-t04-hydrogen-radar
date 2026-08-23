@@ -11,6 +11,11 @@
   background: var(--app-bg);
 }
 
+/* 多标签关掉时不能再替它预留 42px，否则内容区底部空出一条死区 */
+.app-layout[data-worktab='off'] {
+  --art-full-height: calc(100dvh - var(--header-h) - var(--content-gutter) * 2);
+}
+
 /* ------------------------------------------------------------------ 侧栏 */
 #app-sidebar {
   position: sticky;
@@ -255,20 +260,30 @@ button.sidebar-link {
 .worktab-item {
   display: flex;
   flex-shrink: 0;
-  gap: 6px;
+  gap: 2px;
   align-items: center;
   height: 28px;
-  padding: 0 8px 0 11px;
+  padding: 0 6px 0 0;
   color: var(--muted);
   font-size: 12.5px;
   background: var(--surface);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-xs);
-  cursor: pointer;
   transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
 }
 
+.worktab-link {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 6px 0 11px;
+  color: inherit;
+  white-space: nowrap;
+}
+
 .worktab-item:hover { color: var(--ink); }
+.worktab-item.is-fixed { padding-right: 0; }
+.worktab-item.is-fixed .worktab-link { padding-right: 11px; }
 
 .worktab-item.is-active {
   color: var(--brand);
@@ -277,14 +292,12 @@ button.sidebar-link {
   border-color: transparent;
 }
 
-.worktab-item.is-fixed { padding: 0 11px; }
-
 .worktab-close {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   color: inherit;
   background: transparent;

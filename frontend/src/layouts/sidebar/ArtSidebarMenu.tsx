@@ -8,7 +8,7 @@ import { useCollectStatus } from '../../hooks/useCollectStatus';
  * 侧栏菜单 · 完全由 router/modules 的 meta 派生
  * 想加菜单项请去改路由模块，不要在这里写死数组。
  */
-export function ArtSidebarMenu({ version }: { version?: string }) {
+export function ArtSidebarMenu() {
   const { settings, update } = useSettings();
   const { stats } = useCollectStatus();
   const collapsed = settings.sidebarCollapsed;
@@ -19,7 +19,7 @@ export function ArtSidebarMenu({ version }: { version?: string }) {
         <span className="sidebar-brand-mark"><span>H</span><sub>2</sub></span>
         <span className="sidebar-brand-copy">
           <strong>氢能商机雷达</strong>
-          <small>v{version ?? '—'}</small>
+          <small>v{stats.data?.version ?? '—'}</small>
         </span>
       </NavLink>
 

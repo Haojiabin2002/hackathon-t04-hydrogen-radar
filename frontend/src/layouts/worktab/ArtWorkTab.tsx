@@ -3,7 +3,12 @@ import { X } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useWorktab } from '../../hooks/useWorktab';
 
-/** 多标签页 · 标签数据来自 useWorktab，标题来自路由 meta */
+/**
+ * 多标签页 · 标签数据来自 useWorktab，标题来自路由 meta
+ *
+ * 结构上关闭键必须是链接的**兄弟节点**而不是子节点：
+ * <button> 套在 <a> 里是非法嵌套，而且键盘用户会完全够不到它。
+ */
 export function ArtWorkTab() {
   const { tabs, activePath, closeTab } = useWorktab();
   const listRef = useRef<HTMLDivElement>(null);
@@ -17,31 +22,30 @@ export function ArtWorkTab() {
   return (
     <div className="worktab" ref={listRef} role="tablist" aria-label="已打开页面">
       {tabs.map((tab) => (
-        <NavLink
+        <span
           key={tab.path}
-          to={tab.path}
-          end={tab.path === '/'}
-          role="tab"
-          aria-selected={tab.path === activePath}
-          className={({ isActive }) => `worktab-item ${isActive ? 'is-active' : ''} ${tab.fixed ? 'is-fixed' : ''}`}
+          className={`worktab-item ${tab.path === activePath ? 'is-active' : ''} ${tab.fixed ? 'is-fixed' : ''}`}
         >
-          <span>{tab.title}</span>
+          <NavLink
+            to={tab.path}
+            end={tab.path === '/'}
+            role="tab"
+            aria-selected={tab.path === activePath}
+            className="worktab-link"
+          >
+            {tab.title}
+          </NavLink>
           {!tab.fixed && (
-            <span
+            <button
+              type="button"
               className="worktab-close"
-              role="button"
-              tabIndex={-1}
               aria-label={`关闭 ${tab.title}`}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                closeTab(tab.path);
-              }}
+              onClick={() => closeTab(tab.path)}
             >
               <X size={11} aria-hidden="true" />
-            </span>
+            </button>
           )}
-        </NavLink>
+        </span>
       ))}
     </div>
   );

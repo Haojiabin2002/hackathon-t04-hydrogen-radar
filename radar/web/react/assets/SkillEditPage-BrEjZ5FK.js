@@ -1,4 +1,4 @@
-import{c as K,f as $,g as E,d as L,r as i,u as N,h as P,k as Q,j as e,L as v,b}from"./index-DnhnZiTg.js";import{u as R,A as F}from"./ArtPageHead-aruTDI79.js";import{T}from"./triangle-alert-DR1Zt0h2.js";import{S as z}from"./save-DWV6p0AT.js";import{A as I}from"./arrow-left-DJT7r0Sf.js";const U=K("Braces",[["path",{d:"M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1",key:"ezmyqa"}],["path",{d:"M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1",key:"e1hn23"}]]),_=`---
+import{c as K,f as $,g as E,d as L,r as i,u as N,h as P,k as Q,j as e,L as v,b}from"./index-vagaTHQw.js";import{u as R,A as F}from"./ArtPageHead-Cnz7fzTY.js";import{T}from"./triangle-alert-Ckqm6LSb.js";import{S as z}from"./save-BTrfqIdR.js";import{A as I}from"./arrow-left-CZVyCViy.js";const U=K("Braces",[["path",{d:"M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1",key:"ezmyqa"}],["path",{d:"M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1",key:"e1hn23"}]]),_=`---
 name: 新建技能
 description: 说明它在什么情况下用于分析单条线索
 scope: lead

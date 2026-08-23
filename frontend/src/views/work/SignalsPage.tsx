@@ -1,21 +1,24 @@
-import { useMemo, useState } from 'react';
-import { ExternalLink, Globe2, RadioTower } from 'lucide-react';
+import { useMemo } from 'react';
+import { ExternalLink, Globe2, RadioTower, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiGet } from '../../api/client';
 import type { Signal } from '../../api/types';
 import { useTable, type TableColumn, type TableFilter } from '../../hooks/useTable';
 import { useRouteMeta } from '../../hooks/useRouteMeta';
 import { ArtPageHead } from '../../components/cards/ArtPageHead';
-import { ArtSearchBar } from '../../components/forms/ArtSearchBar';
+import { ArtFilterChips } from '../../components/forms/ArtFilterChips';
 import { ArtPagination } from '../../components/forms/ArtPagination';
 import { ArtTable } from '../../components/tables/ArtTable';
 import { ArtTableHeader } from '../../components/tables/ArtTableHeader';
 import { ArtEmpty, ArtError, ArtLoading } from '../../components/feedback/ArtStates';
 
 const FILTERS: Array<TableFilter<Signal>> = [
-  { key: 'all', label: '全部信号', test: () => true },
+  { key: 'all', label: '全部', test: () => true },
   { key: 'domestic', label: '境内来源', test: (signal) => !signal.overseas },
   { key: 'overseas', label: '海外来源', test: (signal) => signal.overseas },
+  // 原本是一张不可点的指标卡。有用的是"哪些没载日期"——那是要去核的，
+  // 做成筛选才有动作；只显示个数字是噪声。
+  { key: 'undated', label: '原文未载日期', test: (signal) => !signal.published_at },
 ];
 
 function formatDate(value?: string | null) {
@@ -81,7 +84,6 @@ const columns: Array<TableColumn<Signal>> = [
 
 export default function SignalsPage() {
   const meta = useRouteMeta();
-  const [searchOpen, setSearchOpen] = useState(false);
 
   const searchFields = useMemo(
     () => (signal: Signal) => [signal.title, signal.source, signal.excerpt],
@@ -117,8 +119,7 @@ export default function SignalsPage() {
   }
 
   const sourceCount = new Set(table.allRows.map((signal) => signal.source)).size;
-  const overseasCount = table.allRows.filter((signal) => signal.overseas).length;
-  const datedCount = table.allRows.filter((signal) => Boolean(signal.published_at)).length;
+  const activeFilterLabel = FILTERS.find((item) => item.key === table.activeFilter)?.label ?? '全部';
 
   return (
     <section className="page art-full-height">
@@ -129,53 +130,43 @@ export default function SignalsPage() {
         actions={<Link className="btn btn-quiet" to="/sources"><Globe2 size={15} />管理数据源</Link>}
       />
 
-      <div className="metric-grid" aria-label="信号概览">
-        <div className="metric-card is-accent">
-          <span>入库信号</span><strong>{table.allRows.length}</strong><small>全部来自真实 HTTP 抓取</small>
-        </div>
-        <div className="metric-card">
-          <span>公开信源</span><strong>{sourceCount}</strong><small>当前结果覆盖的来源数</small>
-        </div>
-        <Link className="metric-card" to="/signals?filter=overseas">
-          <span>海外信号</span><strong>{overseasCount}</strong><small>由数据源配置判定</small>
-        </Link>
-        <div className="metric-card">
-          <span>载明发布日期</span><strong>{datedCount}</strong>
-          <small>{table.allRows.length - datedCount} 条原文未载日期</small>
-        </div>
-      </div>
-
-      <ArtSearchBar
-        open={searchOpen}
-        keyword={table.keyword}
-        onSearch={table.setKeyword}
-        onReset={() => table.setActiveFilter(FILTERS[0].key)}
-        placeholder="搜索公告、来源、正文摘要…"
-      />
-
       <div className="art-table-card">
         <div className="art-table-card-body">
           <ArtTableHeader
+            search={{
+              value: table.keyword,
+              onChange: table.setKeyword,
+              placeholder: '搜索公告、来源、正文摘要…',
+              label: '搜索公告标题、来源或正文摘要',
+            }}
             left={
-              <div className="toolbar-group" role="group" aria-label="来源范围">
-                {FILTERS.map((filter) => (
-                  <button
-                    key={filter.key}
-                    type="button"
-                    className={`filter-chip ${filter.key === table.activeFilter ? 'is-active' : ''}`}
-                    aria-pressed={filter.key === table.activeFilter}
-                    onClick={() => table.setActiveFilter(filter.key)}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
+              <ArtFilterChips
+                label="来源范围"
+                filters={FILTERS}
+                counts={table.filterCounts}
+                active={table.activeFilter}
+                onChange={table.setActiveFilter}
+              />
             }
-            count={`显示 ${table.total} / ${table.allRows.length} 条`}
+            status={
+              <>
+                <span>
+                  {table.keyword && table.total !== table.scopeTotal
+                    ? `${activeFilterLabel} 共 ${table.scopeTotal} 条，关键词命中 ${table.total} 条`
+                    : `${activeFilterLabel} ${table.total} 条 · 覆盖 ${sourceCount} 个信源`}
+                </span>
+                {table.keyword && (
+                  <span className="art-active-keyword">
+                    关键词「{table.keyword}」
+                    <button type="button" aria-label="清除关键词" onClick={() => table.setKeyword('')}>
+                      <X size={12} aria-hidden="true" />
+                    </button>
+                  </span>
+                )}
+              </>
+            }
             loading={table.isFetching}
             onRefresh={() => void table.refetch()}
-            searchOpen={searchOpen}
-            onToggleSearch={() => setSearchOpen((value) => !value)}
             columns={table.columns}
             hiddenColumns={table.hiddenColumns}
             onToggleColumn={table.toggleColumn}
@@ -187,7 +178,9 @@ export default function SignalsPage() {
             rowKey={(signal) => signal.id}
             sort={table.sort}
             onToggleSort={table.toggleSort}
-            emptyContent="当前搜索词或来源范围没有结果，数据库中的原始记录未被删除。"
+            emptyContent={table.keyword
+              ? `「${table.keyword}」在${activeFilterLabel}范围内没有命中，数据库中的原始记录未被删除。`
+              : '该范围内暂无记录，数据库中的原始记录未被删除。'}
           />
 
           <ArtPagination

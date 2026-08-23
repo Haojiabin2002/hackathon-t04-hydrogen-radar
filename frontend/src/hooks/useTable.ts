@@ -92,18 +92,43 @@ export function useTable<T>({
 
   const allRows = useMemo(() => query.data ?? [], [query.data]);
 
+  const lowered = keyword.toLocaleLowerCase('zh-CN');
+
+  const matchesKeyword = useCallback((row: T) => {
+    if (!lowered || !searchFields) return true;
+    return searchFields(row).some((value) =>
+      value?.toLocaleLowerCase('zh-CN').includes(lowered),
+    );
+  }, [lowered, searchFields]);
+
+  /** 关键词命中的行。筛选计数与结果集共用这一层，口径才不会打架。 */
+  const keywordRows = useMemo(
+    () => (lowered ? allRows.filter(matchesKeyword) : allRows),
+    [allRows, lowered, matchesKeyword],
+  );
+
+  /**
+   * 每个筛选的计数 —— **含当前关键词**。
+   * 计数若忽略关键词，chip 上写着 (23) 点进去只有 3 条，用户无从解释。
+   */
+  const filterCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filters.forEach((filter) => {
+      counts[filter.key] = keywordRows.filter(filter.test).length;
+    });
+    return counts;
+  }, [filters, keywordRows]);
+
   const filteredRows = useMemo(() => {
     const filter = filters.find((item) => item.key === activeFilter);
-    const lowered = keyword.toLocaleLowerCase('zh-CN');
-    return allRows.filter((row) => {
-      if (filter && !filter.test(row)) return false;
-      if (!lowered) return true;
-      if (!searchFields) return true;
-      return searchFields(row).some((value) =>
-        value?.toLocaleLowerCase('zh-CN').includes(lowered),
-      );
-    });
-  }, [allRows, filters, activeFilter, keyword, searchFields]);
+    return filter ? keywordRows.filter(filter.test) : keywordRows;
+  }, [keywordRows, filters, activeFilter]);
+
+  /** 当前筛选范围内的总数（**不含**关键词），用作"命中 3 / 范围 96"的分母 */
+  const scopeTotal = useMemo(() => {
+    const filter = filters.find((item) => item.key === activeFilter);
+    return filter ? allRows.filter(filter.test).length : allRows.length;
+  }, [allRows, filters, activeFilter]);
 
   const sortedRows = useMemo(() => {
     if (!sort) return filteredRows;
@@ -172,8 +197,10 @@ export function useTable<T>({
     keyword,
     setKeyword,
     filters,
+    filterCounts,
     activeFilter,
     setActiveFilter,
+    scopeTotal,
     // 分页
     page: safePage,
     pageCount,

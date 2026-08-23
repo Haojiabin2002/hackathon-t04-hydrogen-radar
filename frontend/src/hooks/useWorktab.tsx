@@ -31,13 +31,24 @@ const WorktabContext = createContext<WorktabContextValue | null>(null);
 const STORAGE_KEY = 'hydrogen-radar-worktabs';
 const HOME: WorkTabItem = { path: '/', title: '当日研判', fixed: true };
 
-/** 动态路由带上末段编号，避免两条商机详情挤成同一个标签看不出区别 */
+/**
+ * 动态路由带上参数值，避免两条商机详情挤成同一个标签看不出区别。
+ *
+ * 注意取的是**动态段对应位置**的值，不是 pathname 末段：
+ * /skills/:skillKey/edit 的末段是字面量 'edit'，取末段会得到「编辑技能 #edit」。
+ */
 function resolveTitle(pathname: string): string | null {
   const route = matchRoute(pathname);
   if (!route || route.meta.hideInWorktab) return null;
   if (!route.path.includes(':')) return route.meta.title;
-  const tail = pathname.split('/').filter(Boolean).pop();
-  return tail ? `${route.meta.title} #${tail}` : route.meta.title;
+
+  const pattern = route.path.split('/');
+  const actual = pathname.split('/');
+  const values = pattern
+    .map((segment, index) => (segment.startsWith(':') ? actual[index] : null))
+    .filter((value): value is string => Boolean(value));
+
+  return values.length ? `${route.meta.title} #${values.join('/')}` : route.meta.title;
 }
 
 function readStored(): WorkTabItem[] {
@@ -77,16 +88,15 @@ export function WorktabProvider({ children }: { children: ReactNode }) {
 
   const closeTab = useCallback((path: string) => {
     if (path === '/') return;
-    setTabs((prev) => {
-      const index = prev.findIndex((tab) => tab.path === path);
-      if (index < 0) return prev;
-      const next = prev.filter((tab) => tab.path !== path);
-      if (path === location.pathname) {
-        navigate(next[index - 1]?.path ?? next[next.length - 1]?.path ?? '/');
-      }
-      return next.length ? next : [HOME];
-    });
-  }, [location.pathname, navigate]);
+    // 先算好落点再改状态：navigate 是副作用，不能写在 setState 的更新函数里
+    const index = tabs.findIndex((tab) => tab.path === path);
+    if (index < 0) return;
+    const next = tabs.filter((tab) => tab.path !== path);
+    setTabs(next.length ? next : [HOME]);
+    if (path === location.pathname) {
+      navigate(next[index - 1]?.path ?? next[next.length - 1]?.path ?? '/');
+    }
+  }, [tabs, location.pathname, navigate]);
 
   const closeOthers = useCallback((path: string) => {
     setTabs((prev) => prev.filter((tab) => tab.path === path || tab.fixed));

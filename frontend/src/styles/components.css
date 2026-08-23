@@ -96,14 +96,21 @@
 .art-table th:first-child { border-top-left-radius: var(--radius-xs); }
 .art-table th:last-child { border-top-right-radius: var(--radius-xs); }
 
-.art-table th.is-sortable { cursor: pointer; user-select: none; }
-.art-table th.is-sortable:hover { color: var(--ink); }
-
+/* 排序键是 th 里的一个真按钮，热区铺满单元格 */
 .art-table th .art-table-sort {
   display: inline-flex;
   gap: 4px;
   align-items: center;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  user-select: none;
 }
+
+.art-table th .art-table-sort:hover { color: var(--ink); }
 
 .art-table td {
   padding: 13px 14px;
@@ -126,9 +133,8 @@
 .art-table-header {
   display: flex;
   gap: 10px;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding-bottom: 12px;
 }
 
 .art-table-header-left {
@@ -210,53 +216,112 @@
 
 .art-tool-anchor { position: relative; }
 
-/* --------------------------------------------------------------- 搜索栏 */
-/* 列表页三段式的第一段：可折叠，条件改变不自动请求，交给「查询」按钮。 */
-.art-search-bar {
-  padding: 14px 16px;
-  background: var(--surface);
-  border-radius: var(--radius-panel);
-}
+/* ----------------------------------------------------- 列表工具条 */
+/* 上排：常驻关键词 + 筛选 chip | 表格工具
+ * 下排：结果计数与生效中的关键词 */
+.art-list-toolbar { padding-bottom: 10px; }
 
-.art-search-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.art-search-field {
-  display: grid;
+.art-inline-search {
+  display: flex;
+  flex-shrink: 0;
   gap: 6px;
-  min-width: 0;
-}
-
-.art-search-field > label {
+  align-items: center;
+  width: 250px;
+  height: var(--control-h);
+  padding: 0 8px 0 11px;
   color: var(--muted);
-  font-weight: 600;
-  font-size: 12px;
+  background: var(--surface-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
 }
 
-.art-search-actions {
+.art-inline-search:focus-within {
+  background: var(--surface);
+  border-color: var(--brand-line);
+}
+
+.art-inline-search input {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 13.5px;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.art-inline-search input::-webkit-search-cancel-button { display: none; }
+
+.art-inline-search-clear {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.art-inline-search-clear:hover { color: var(--ink); background: var(--surface-pressed); }
+
+.art-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* 分隔线左边是"在研"范围内的筛选，右边是另一个范围 */
+.art-filter-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+.art-list-status {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  justify-content: flex-end;
-  margin-top: 12px;
+  padding-top: 10px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
 }
 
-.art-search-toggle {
+/* 生效中的关键词做成可删除的 token，让"为什么只有 3 条"一眼可解释 */
+.art-active-keyword {
   display: inline-flex;
-  gap: 4px;
+  gap: 5px;
   align-items: center;
-  padding: 0;
+  height: 24px;
+  padding: 0 4px 0 10px;
   color: var(--brand);
-  font-size: 12.5px;
   font-weight: 600;
+  background: var(--brand-soft);
+  border-radius: var(--radius-pill);
+}
+
+.art-active-keyword button {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  color: inherit;
   background: transparent;
   border: 0;
+  border-radius: 50%;
   cursor: pointer;
 }
+
+.art-active-keyword button:hover { background: var(--surface); }
 
 /* ------------------------------------------------------------ 分页器 */
 .art-pagination {
@@ -514,7 +579,6 @@
 @media (max-width: 620px) {
   .header-collect-btn span { display: none; }
   .header-collect-btn { width: var(--control-h); padding: 0; justify-content: center; }
-  .art-search-actions { justify-content: stretch; }
 }
 
 /* ======================= 以下为 v0.5.0 既有组件语言，已迁到新令牌 ==================== */
@@ -650,7 +714,17 @@
 .table-title a,
 .table-title strong { font-weight: 650; text-decoration: none; }
 .table-title a:hover { color: var(--brand-strong); text-decoration: underline; }
-.table-title small { color: var(--muted); line-height: 1.55; }
+/* 摘要在表格里必须夹断。信号页的 excerpt 是整段抓取正文，
+ * 不夹断的话一行公告能占掉六行，把表格挤成没法扫的墙。 */
+.table-title small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  line-height: 1.55;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 .cell-muted { color: var(--muted); }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
@@ -668,6 +742,27 @@
   font-size: 13px;
 }
 .filter-chip:hover { color: var(--ink); border-color: var(--line-strong); background: var(--surface-subtle); }
+
+/* chip 里的计数做成独立小药丸。
+ * 只加间距不够——「高分 ≥80」后面紧跟「3」会被读成「803」。 */
+.filter-chip b {
+  min-width: 18px;
+  margin-left: 7px;
+  padding: 0 5px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-pill);
+  font-variant-numeric: tabular-nums;
+}
+
+.filter-chip.is-active b {
+  color: var(--brand);
+  background: var(--surface);
+}
 .filter-chip.is-active { color: var(--brand); background: var(--brand-soft); border-color: var(--brand-line); }
 
 .btn {
@@ -978,7 +1073,6 @@
   .search-field { min-width: 100%; }
   .message { max-width: 94%; }
   .inline-confirm { align-items: flex-start; flex-direction: column; }
-  .art-search-grid { grid-template-columns: 1fr; }
   .empty-state.panel {
     min-height: 190px;
     grid-template-columns: 1fr;
@@ -1055,4 +1149,10 @@
   .breadcrumb { display: none; }
   .header-bar { gap: 8px; padding: 0 12px; }
   .header-actions { gap: 4px; }
+}
+
+/* 窄屏：关键词框占满一行，chip 换行跟在下面 */
+@media (max-width: 760px) {
+  .art-inline-search { width: 100%; }
+  .art-table-header-left { width: 100%; }
 }

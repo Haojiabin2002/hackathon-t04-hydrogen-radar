@@ -7,7 +7,6 @@ import { ArtSettingsDrawer } from './settings/ArtSettingsDrawer';
 import { ArtPageContent } from './content/ArtPageContent';
 import { useSettings } from '../hooks/useSettings';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { useCollectStatus } from '../hooks/useCollectStatus';
 import { WorktabProvider } from '../hooks/useWorktab';
 
 /**
@@ -22,7 +21,6 @@ import { WorktabProvider } from '../hooks/useWorktab';
  */
 export function AppLayout() {
   const { settings, update } = useSettings();
-  const { stats } = useCollectStatus();
   const location = useLocation();
   const isNarrow = useMediaQuery('(max-width: 900px)');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -40,13 +38,15 @@ export function AppLayout() {
     else update({ sidebarCollapsed: !settings.sidebarCollapsed });
   };
 
+  const worktabVisible = settings.showWorktab && !isNarrow;
+
   return (
     <WorktabProvider>
-      <div className="app-layout" data-sidebar={sidebarState}>
+      <div className="app-layout" data-sidebar={sidebarState} data-worktab={worktabVisible ? 'on' : 'off'}>
         <a className="skip-link" href="#main-content">跳到主要内容</a>
 
         <aside id="app-sidebar">
-          <ArtSidebarMenu version={stats.data?.version} />
+          <ArtSidebarMenu />
         </aside>
 
         {isNarrow && mobileNavOpen && (
@@ -66,9 +66,7 @@ export function AppLayout() {
             />
           </header>
 
-          {settings.showWorktab && !isNarrow && (
-            <div id="app-worktab"><ArtWorkTab /></div>
-          )}
+          {worktabVisible && <div id="app-worktab"><ArtWorkTab /></div>}
 
           <div id="app-content"><ArtPageContent /></div>
         </div>

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiMutation } from '../api/client';
 import type { CollectStartResult, CollectStatus, RadarStats } from '../api/types';
@@ -22,7 +23,12 @@ export function formatTime(value?: string | null): string {
   }).format(date);
 }
 
-export function useCollectStatus() {
+/**
+ * @param watchCompletion 是否负责"采集结束后重取看板数据"。
+ *   这个副作用**只能有一个持有者**（当前是 ArtHeaderBar）——
+ *   本 hook 会被侧栏和顶栏分别调用，不加这道闸就会重复触发。
+ */
+export function useCollectStatus({ watchCompletion = false } = {}) {
   const queryClient = useQueryClient();
 
   const stats = useQuery({
@@ -44,8 +50,24 @@ export function useCollectStatus() {
     },
   });
 
-  const result = status.data?.last_result;
   const isRunning = Boolean(status.data?.running);
+
+  // 采集从"运行中"落回"已结束"的那一刻，把看板数据全部作废重取。
+  // 少了这一步，采集完成后 signals / leads / stats 会一直停在旧值——
+  // stats 是 refetchOnWindowFocus: false，页面开着就永远不会自己更新。
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (!watchCompletion) return;
+    if (wasRunning.current && !isRunning) {
+      void queryClient.invalidateQueries({ queryKey: ['stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['signals'] });
+      void queryClient.invalidateQueries({ queryKey: ['leads'] });
+      void queryClient.invalidateQueries({ queryKey: ['sources'] });
+    }
+    wasRunning.current = isRunning;
+  }, [watchCompletion, isRunning, queryClient]);
+
+  const result = status.data?.last_result;
   const lastError = status.data?.last_error?.trim() ?? '';
   const crawlerError = result?.crawler_error?.trim() ?? '';
   const pipelineStatus = result?.pipeline?.trim() ?? '';

@@ -17,7 +17,8 @@ export function ArtHeaderBar({
   onOpenSettings: () => void;
 }) {
   const { settings, resolvedTheme, update } = useSettings();
-  const { status, start, isRunning, chainFailed, headline, detail } = useCollectStatus();
+  // 顶栏是「启动雷达」的归属地，采集结束后重取看板数据的副作用也挂在这里
+  const { status, start, isRunning, chainFailed, headline, detail } = useCollectStatus({ watchCompletion: true });
   const [runOpen, setRunOpen] = useState(false);
   const runPanelId = useId();
 

@@ -170,7 +170,15 @@ export default function TodayPage() {
       state: stats.data?.cards ? 'ready' : stats.data?.leads ? 'waiting' : 'empty',
       detail: stats.data?.cards_orphan ? `${stats.data.cards_orphan} 张待关联` : '交付出口',
     },
-  ];
+  ].map((stage, index, all) => ({
+    ...stage,
+    // 第一环节永远显示绝对值；之后与上一环节相等且非零，视为"无损耗"
+    carriedOver:
+      index > 0 &&
+      typeof stage.value === 'number' &&
+      stage.value > 0 &&
+      stage.value === all[index - 1].value,
+  }));
 
   const selectSignal = (signalId: number) => {
     setSelectedSignalId(signalId);
@@ -211,8 +219,17 @@ export default function TodayPage() {
                 </div>
                 <div className="trade-trace-copy">
                   <span>{stage.label}</span>
-                  <strong>{stage.value ?? '—'} <small>{stage.unit}</small></strong>
-                  <em>{stage.detail}</em>
+                  {stage.carriedOver ? (
+                    // 与上一环节数量相同 = 这一步没有损耗。
+                    // 再写一遍同样的数字只会让链路看起来像三个重复的大数，
+                    // 真正该看的是"从哪一步开始收窄"。
+                    // 单位串本身带量词（"条可回源"），跟在"全部"后面会读成
+                    // "全部条可回源"，所以去掉打头的量词
+                    <strong>全部 <small>{stage.unit.replace(/^[条张]/, '')}</small></strong>
+                  ) : (
+                    <strong>{stage.value ?? '—'} <small>{stage.unit}</small></strong>
+                  )}
+                  <em>{stage.carriedOver ? `${stage.value} 条 · ${stage.detail}` : stage.detail}</em>
                 </div>
                 {index < traceStages.length - 1 && <ArrowRight className="trade-trace-arrow" size={18} aria-hidden="true" />}
               </li>
