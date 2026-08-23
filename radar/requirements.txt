@@ -1,4 +1,7 @@
 # 版本号取自本地已验证可跑的 .venv，不要随意升级
+# api.py 的 SSE 端点直接用 anyio.to_thread 把同步队列桥到异步生成器。
+# 它本来就是 fastapi/starlette 的传递依赖，但既然我们直接 import，就显式钉住。
+anyio==4.14.2
 beautifulsoup4==4.15.0
 fastapi==0.141.1
 lxml==6.1.1
