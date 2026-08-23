@@ -1,0 +1,23 @@
+/* ============================================================================
+ * 样式入口 · 唯一被 main.tsx 引入的文件
+ *
+ * 加载顺序即层级顺序，不要调换：
+ *   fonts      字体包
+ *   tokens     ① 原子 ② 角色 ③ 旋钮   —— 唯一允许出现色值的地方
+ *   reset      归零与全局排版基线
+ *   utilities  原子工具类
+ *   layout     壳骨架（侧栏 / 顶栏 / 多标签 / 内容区）
+ *   components 全站共用组件
+ *   motion     关键帧与过渡
+ *
+ * 页面私有样式不在这里引，跟着页面文件走（见 views/<域>/<页>.css）。
+ * ========================================================================= */
+
+@import '@fontsource-variable/ibm-plex-sans';
+
+@import './tokens.css';
+@import './reset.css';
+@import './utilities.css';
+@import './layout.css';
+@import './components.css';
+@import './motion.css';

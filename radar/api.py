@@ -13,14 +13,15 @@ from urllib.parse import urlsplit
 
 import yaml
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import (FileResponse, JSONResponse, PlainTextResponse,
+                               StreamingResponse)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from db import connect
 
 # 全项目唯一版本号来源：改这里，OpenAPI、/api/stats、看板角标一起变
-VERSION = "0.5.0"
+VERSION = "1.0.0"
 
 app = FastAPI(title="氢能商机雷达 API", version=VERSION)
 WEB = Path(__file__).parent / "web"
@@ -1077,6 +1078,157 @@ class ChatIn(BaseModel):
     question: str
 
 
+class AgentIn(BaseModel):
+    goal: str
+    max_steps: int | None = None
+    # 界面上选中的线索。给了就直接进上下文，省掉模型先调一次 get_lead 的往返。
+    lead_id: int | None = None
+
+
+class PreferenceIn(BaseModel):
+    key: str
+    value: object
+
+
+
+@app.post("/api/agent")
+def run_agent(body: AgentIn, request: Request):
+    """Agent 循环：给一个目标，模型自己决定调哪些工具、调几次、何时收敛。
+
+    与 /api/chat 的区别：chat 是单次调用返回一段话；agent 是多步循环，
+    返回里带完整执行轨迹（trace），界面要把每一步展示出来——
+    一个不能复盘的 agent 不可信。
+    """
+    _guard_local(request)          # agent 会真实消耗模型额度，按写操作对待
+    goal = (body.goal or "").strip()
+    if not goal:
+        raise HTTPException(status_code=400, detail="goal 不能为空")
+    try:
+        import agent as ag
+        from llm import LLMUnavailable
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Agent 模块不可用：{e}")
+    steps = body.max_steps if body.max_steps else ag.MAX_STEPS
+    steps = max(1, min(int(steps), 12))
+    try:
+        return ag.run(goal, max_steps=steps, lead_id=body.lead_id)
+    except LLMUnavailable as e:
+        raise HTTPException(status_code=503, detail=f"LLM 通道不可用：{e}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+
+
+@app.post("/api/agent/stream")
+async def run_agent_stream(body: AgentIn, request: Request):
+    """Agent 循环的流式版本（SSE）。
+
+    一次 agent 调用要跑 1-3 分钟。非流式接口会让用户对着空白等两分钟，
+    既不知道它在干什么，也不知道是不是卡死了。所以把 agent.run 的 on_step
+    回调桥接成 SSE：每完成一步就推一条，前端实时画出执行轨迹。
+
+    **取消**：客户端断开后必须真把后端停下来。少了这一步，用户点「停止」
+    只停了前端，worker 会跑完剩余步数、继续烧模型额度；而 remember /
+    set_preference 这两个工具是 confirm=False 的，会继续往
+    ~/.config/hydrogen-radar/ 写盘。界面那句「已停止」就成了不实陈述。
+    做法：on_step 里检查取消位并抛异常——agent.run 调 on_step 时不在 try 内，
+    异常会穿出来被下面的 except 接住，于是在**步边界**干净停住。
+
+    事件：step / done / error，外加空闲时的 `: keepalive` 心跳
+    （首次模型调用要几十秒，没有心跳中间层可能把连接掐掉）。
+    """
+    _guard_local(request)
+    goal = (body.goal or "").strip()
+    if not goal:
+        raise HTTPException(status_code=400, detail="goal 不能为空")
+
+    import queue
+    import threading
+    import traceback
+
+    import anyio.to_thread
+
+    steps = max(1, min(int(body.max_steps or 8), 12))
+    q: "queue.Queue[tuple[str, object]]" = queue.Queue()
+    cancel = threading.Event()
+
+    class _Cancelled(Exception):
+        pass
+
+    def on_step(entry):
+        q.put(("step", entry))
+        if cancel.is_set():
+            raise _Cancelled("客户端已断开")
+
+    def worker():
+        try:
+            import agent as ag
+            q.put(("done", ag.run(goal, max_steps=steps, on_step=on_step,
+                                  lead_id=body.lead_id)))
+        except _Cancelled:
+            pass                       # 正常取消，不当错误上报
+        except Exception as e:         # 含 LLMUnavailable
+            # 客户端已断开时下面这条消息没人读，所以必须同时落服务端日志——
+            # 否则通道不通在这条路径上零记录（CLAUDE.md 第四节）。
+            traceback.print_exc()
+            q.put(("error", {"detail": f"{type(e).__name__}: {e}"}))
+        finally:
+            q.put(("__end__", None))
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    async def events():
+        try:
+            while True:
+                try:
+                    kind, payload = await anyio.to_thread.run_sync(
+                        lambda: q.get(timeout=1.0))
+                except queue.Empty:
+                    if await request.is_disconnected():
+                        cancel.set()
+                        return
+                    yield ": keepalive\n\n"
+                    continue
+                if kind == "__end__":
+                    return
+                yield f"event: {kind}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        finally:
+            cancel.set()               # 生成器被关闭（客户端断开）也要停 worker
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-store",
+        "X-Accel-Buffering": "no",     # 反代下禁缓冲，否则 SSE 会被攒着一次性吐出
+    })
+
+
+@app.get("/api/agent/tools")
+def agent_tools():
+    """工具目录，供界面展示 agent 能做什么。"""
+    import tools as tl
+    return {"tools": [
+        {"name": n, "description": s["desc"], "args": s["args"], "requires_confirm": s["confirm"]}
+        for n, s in tl.REGISTRY.items()
+    ]}
+
+
+@app.get("/api/preferences")
+def get_preferences():
+    import harness as hz
+    return {"preferences": hz.read_prefs(),
+            "schema": {k: v["desc"] for k, v in hz.PREF_SCHEMA.items()}}
+
+
+@app.put("/api/preferences")
+def put_preference(body: PreferenceIn, request: Request):
+    _guard_local(request)
+    import harness as hz
+    try:
+        return hz.set_preference(body.key, body.value)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/api/chat")
 def chat(body: ChatIn):
     """对话面板后端。通道不通时返回 503 并说明原因——不使用任何预置应答。
@@ -1275,6 +1427,14 @@ def react_spa(path: str):
     """托管 React 页面并支持前端路由刷新；未知 API 仍返回标准 404。"""
     if path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API 路由不存在")
+
+    # 构建根目录下的真实静态文件（favicon.svg 等）先直接返回。
+    # 只有 /assets/* 是独立静态挂载，根目录文件不特判就会被 SPA 兜底吞成 index.html。
+    # 限制为"不含斜杠、不以点开头"的单段文件名，路径无法逃出 REACT_WEB。
+    if path and "/" not in path and not path.startswith("."):
+        static_file = REACT_WEB / path
+        if static_file.is_file():
+            return FileResponse(static_file)
 
     entry = REACT_WEB / "index.html"
     if entry.is_file():

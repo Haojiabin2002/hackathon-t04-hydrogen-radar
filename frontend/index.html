@@ -3,20 +3,57 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#fcfcfc" />
+    <meta name="theme-color" content="#fcfcfd" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#070911" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
       content="氢能产业商机雷达：从公开信号中发现、核验并推进高价值销售机会。"
     />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>氢能商机雷达</title>
+    <script>
+      /*
+       * 首绘前落地外观设置，避免刷新时先闪一下亮色再切暗色。
+       * 这里读的键、写的属性必须和 src/hooks/useSettings.tsx 完全一致：
+       *   localStorage: hydrogen-radar-settings
+       *   <html> 上写：data-theme / data-box-mode / --brand-seed / --radius-knob / --container-max
+       */
+      (function () {
+        var DEFAULTS = {
+          theme: 'system',
+          brandSeed: '#145aff',
+          radiusKnob: 14,
+          boxMode: 'shadow-mode',
+          containerWidth: 'boxed'
+        };
+        var s = DEFAULTS;
+        try {
+          var raw = localStorage.getItem('hydrogen-radar-settings');
+          if (raw) s = Object.assign({}, DEFAULTS, JSON.parse(raw));
+        } catch (e) {
+          /* 隐私模式下读不到就用默认值 */
+        }
+        var dark =
+          s.theme === 'dark' ||
+          (s.theme === 'system' &&
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var root = document.documentElement;
+        root.setAttribute('data-theme', dark ? 'dark' : 'light');
+        root.setAttribute('data-box-mode', s.boxMode);
+        root.style.setProperty('--brand-seed', s.brandSeed);
+        root.style.setProperty('--radius-knob', s.radiusKnob + 'px');
+        root.style.setProperty('--container-max', s.containerWidth === 'full' ? '100%' : '1560px');
+      })();
+    </script>
   </head>
   <body>
     <!--
       THESIS: 真实商机链路就是产品主画面；拒绝把工作流拆成互不相关的指标卡墙。
       OWN-WORLD: 冷白画布、淡紫洗色、午夜墨色与皇家蓝；圆角产品容器、胶囊控件、柔和层级和小型语义状态点。
       STORY: 用户先确认链路健康，再选择真实信号，核对模型判断与原始证据，最后推进销售动作。
-      FIRST VIEWPORT: 浮动浅色导航下，圆角链路带与三栏工作台共同占据产品画布；右上角始终保留启动雷达主操作。
-      FORM: 用户指定的 Relate 冷色产品画布视觉；沿用审计键 14f4f5c3，不改变既有信息架构与交互。
+      SHELL: 侧栏 + 顶栏 + 多标签的后台骨架（结构取自 art-design-pro），视觉仍走 DESIGN.md 冷色画布。
+      FORM: 三层令牌（原子 / 角色 / 旋钮），亮暗两套只换角色层；圆角由 --radius-knob 单旋钮派生。
       FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
     -->
     <div id="root"></div>

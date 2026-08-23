@@ -1,0 +1,352 @@
+/* ============================================================================
+ * 布局骨架 · 左侧栏 + 顶栏 + 多标签 + 内容区
+ * 结构对齐 art-design-pro：.app-layout > #app-sidebar + #app-main(#app-header,
+ * #app-worktab, #app-content)。尺寸全部走 tokens.css 的旋钮层。
+ * ========================================================================= */
+
+.app-layout {
+  display: flex;
+  width: 100%;
+  min-height: 100dvh;
+  background: var(--app-bg);
+}
+
+/* 多标签关掉时不能再替它预留 42px，否则内容区底部空出一条死区 */
+.app-layout[data-worktab='off'] {
+  --art-full-height: calc(100dvh - var(--header-h) - var(--content-gutter) * 2);
+}
+
+/* ------------------------------------------------------------------ 侧栏 */
+#app-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  flex-shrink: 0;
+  width: var(--sidebar-w);
+  height: 100dvh;
+  transition: width var(--dur-base) var(--ease);
+}
+
+.app-layout[data-sidebar='collapsed'] #app-sidebar {
+  width: var(--sidebar-collapsed-w);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+  border-right: 1px solid var(--card-border);
+}
+
+.sidebar-brand {
+  display: flex;
+  flex-shrink: 0;
+  gap: 10px;
+  align-items: center;
+  height: var(--header-h);
+  padding: 0 14px;
+  overflow: hidden;
+}
+
+.sidebar-brand-mark {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--brand-on);
+  background: var(--brand);
+  border-radius: var(--radius-control);
+}
+
+.sidebar-brand-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.sidebar-brand-copy strong {
+  font-weight: 650;
+  font-size: 14.5px;
+  letter-spacing: -.02em;
+}
+
+.sidebar-brand-copy small {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-layout[data-sidebar='collapsed'] .sidebar-brand-copy { display: none; }
+.app-layout[data-sidebar='collapsed'] .sidebar-brand { justify-content: center; padding: 0; }
+
+.sidebar-scroll {
+  flex: 1;
+  padding: 6px 10px 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.sidebar-group + .sidebar-group { margin-top: 14px; }
+
+.sidebar-group-label {
+  padding: 0 10px 6px;
+  color: var(--faint);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.app-layout[data-sidebar='collapsed'] .sidebar-group-label {
+  overflow: hidden;
+  height: 8px;
+  padding: 0;
+  color: transparent;
+  border-top: 1px solid var(--line);
+  margin: 0 8px 8px;
+}
+
+.sidebar-link {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: 40px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 14px;
+  border-radius: var(--radius-control);
+  transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.sidebar-link + .sidebar-link { margin-top: 2px; }
+
+/* 侧栏里的 button（收起侧栏）要和 NavLink 长得一样，去掉原生按钮外观 */
+button.sidebar-link {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.sidebar-link svg { flex-shrink: 0; }
+.sidebar-link span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sidebar-link:hover { color: var(--ink); background: var(--surface-hover); }
+
+.sidebar-link.is-active {
+  color: var(--brand);
+  font-weight: 600;
+  background: var(--brand-soft);
+}
+
+.sidebar-link-badge {
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: auto;
+  color: var(--brand-on);
+  font-weight: 600;
+  font-size: 10.5px;
+  line-height: 18px;
+  text-align: center;
+  background: var(--brand);
+  border-radius: var(--radius-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-layout[data-sidebar='collapsed'] .sidebar-link {
+  justify-content: center;
+  padding: 0;
+}
+
+.app-layout[data-sidebar='collapsed'] .sidebar-link span,
+.app-layout[data-sidebar='collapsed'] .sidebar-link-badge { display: none; }
+
+.sidebar-foot {
+  flex-shrink: 0;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* ------------------------------------------------------------------ 主区 */
+#app-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  flex-shrink: 0;
+  height: var(--header-h);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.header-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--content-gutter);
+}
+
+.header-bar-spacer { flex: 1; min-width: 0; }
+
+.header-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+}
+
+/* 面包屑 */
+.breadcrumb {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.breadcrumb-item { white-space: nowrap; }
+.breadcrumb-item.is-current { color: var(--ink); font-weight: 600; }
+.breadcrumb a:hover { color: var(--brand); }
+.breadcrumb-sep { color: var(--faint); }
+
+/* ------------------------------------------------------------- 多标签页 */
+#app-worktab {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 40;
+  flex-shrink: 0;
+  height: var(--worktab-h);
+  background: var(--app-bg);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.worktab {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--content-gutter);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.worktab::-webkit-scrollbar { display: none; }
+
+.worktab-item {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  align-items: center;
+  height: 28px;
+  padding: 0 6px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-xs);
+  transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.worktab-link {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 6px 0 11px;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.worktab-item:hover { color: var(--ink); }
+.worktab-item.is-fixed { padding-right: 0; }
+.worktab-item.is-fixed .worktab-link { padding-right: 11px; }
+
+.worktab-item.is-active {
+  color: var(--brand);
+  font-weight: 600;
+  background: var(--brand-soft);
+  border-color: transparent;
+}
+
+.worktab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  opacity: .55;
+  cursor: pointer;
+}
+
+.worktab-close:hover { background: var(--surface-pressed); opacity: 1; }
+
+/* ---------------------------------------------------------------- 内容区 */
+#app-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.layout-content {
+  width: 100%;
+  max-width: var(--container-max);
+  padding: var(--content-gutter);
+  margin: 0 auto;
+}
+
+.layout-content:focus-visible { outline: none; }
+
+/* --------------------------------------------------------- 移动端抽屉 */
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: none;
+  padding: 0;
+  background: var(--scrim);
+  border: 0;
+  cursor: pointer;
+}
+
+.header-sidebar-toggle { display: inline-flex; }
+
+@media (max-width: 900px) {
+  #app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    transform: translateX(-100%);
+    transition: transform var(--dur-base) var(--ease);
+  }
+
+  .app-layout[data-sidebar='open'] #app-sidebar { transform: translateX(0); }
+  .app-layout[data-sidebar='collapsed'] #app-sidebar { width: var(--sidebar-w); }
+  .app-layout[data-sidebar='open'] .sidebar-scrim { display: block; }
+
+  :root { --content-gutter: 15px; }
+  #app-worktab { display: none; }
+
+  /* 抽屉形态下"收起侧栏"不产生任何视觉变化，属于无动作入口，直接隐藏 */
+  .sidebar-foot { display: none; }
+}

@@ -6,7 +6,12 @@ LLM_CHANNEL_NOTE: 2026-08-18 在终端完成登录后，CLI 通道已实测跑�
   2026-08-19 起通道可配置，三选一，进「模型通道」页会先做一次快速探测：
     · claude_cli — 本机已装已登录，当前在用
     · codex_cli  — 本机未安装，界面如实标注，未安装即不可选
-    · api        — OpenAI 兼容 / Anthropic 原生，Key 存 ~/.config/hydrogen-radar/llm.json（0600，不进仓库）
+    · api        — OpenAI 兼容 / Anthropic 原生。**2026-08-23 起内置演示密钥**：
+                   接入点 api.openai-next.com/v1，模型 claude-sonnet-5，常量写在 llm.py 的
+                   BUILTIN_API 里，随仓库分发，clone 或部署后零配置即可跑通全链路。
+                   覆盖顺序：BUILTIN_API < ~/.config/hydrogen-radar/llm.json（0600）< RADAR_LLM_* 环境变量，
+                   所以线上换 key 设 RADAR_LLM_API_KEY 即可，不必改代码。
+                   ⚠️ 密钥在 git 历史中永久存在，仓库私有；演示结束后请轮换。
   切换通道时服务端会自己再实测一次，测不过就不保存；不做任何通道间自动降级。
   CLI 子进程已加固（禁全部工具 + 禁 MCP + 空临时目录 + 最小环境变量 + prompt 走 stdin），
   并有隔离探针实测把关：探针读得到目录外的口令或执行得了 shell，该通道即拒绝启用。

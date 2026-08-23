@@ -1,0 +1,42 @@
+/* 动效层 · 关键帧与路由过渡集中在这里，组件只引用不新增
+ * 约定：交互过渡 120–180ms 且可打断；未知进度只用不确定动画，不合成百分比。 */
+
+@keyframes panel-in { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes message-in { from { opacity: .2; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes terminal-pulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+@keyframes uncertain-progress { from { transform: translateX(-20%); } to { transform: translateX(180%); } }
+@keyframes loading-opacity { from { opacity: .48; } to { opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes drawer-in { from { opacity: .4; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes route-in { from { opacity: .25; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+@keyframes signal-sync {
+  from { transform: translateY(5px); box-shadow: none; }
+  to { transform: translateY(0); box-shadow: var(--shadow-card); }
+}
+
+/* 路由切换：只做一次短位移，避免整页闪烁 */
+.route-transition { animation: route-in 160ms var(--ease) both; }
+
+.trade-spin { animation: spin 1s linear infinite; }
+.trade-signal-sync { animation: signal-sync 360ms var(--ease) both; }
+
+/* 主题切换时抑制全局过渡，避免整页颜色逐个补间 */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
