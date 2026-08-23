@@ -4,6 +4,11 @@ venv/
 env/
 
 # 运行产物：SQLite 是二进制文件，git 无法合并，两人各跑一遍必冲突
+# 任何位置的 radar.db 都不进 git。
+# 只写 radar/radar.db 挡不住误在仓库根目录跑 sqlite3 生成的空库——
+# 2026-08-23 就这样被 git add -A 扫进去过一次。
+radar.db
+radar.db.bak*
 radar/radar.db
 radar/radar.db.bak*
 *.db-journal
