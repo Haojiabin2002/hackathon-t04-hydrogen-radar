@@ -50,7 +50,7 @@ export const workGroup: RouteGroup = {
       meta: {
         title: '研判助手',
         icon: Sparkles,
-        description: '全局模式读取看板索引；商机模式只依据当前档案与公告原文回答。模型提出的动作必须由你确认。',
+        description: 'Agent 自己决定调哪些工具、何时收敛，每一步都可复盘；涉及外部动作的工具只会提议，由你确认。',
       },
     },
   ],

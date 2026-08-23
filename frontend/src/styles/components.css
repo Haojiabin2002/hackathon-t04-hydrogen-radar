@@ -1449,3 +1449,38 @@
 
 /* 通道抖动后的重试步：不是失败也不是成功，用琥珀 */
 .art-trace-step.is-retry .art-trace-marker { color: var(--risk); background: var(--risk-soft); border-color: transparent; }
+
+/* Agent 聚焦条：界面上选中的线索已进上下文 */
+.agent-focus {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 14px 10px;
+  padding: 9px 10px 9px 12px;
+  color: var(--brand);
+  font-size: 12.5px;
+  background: var(--brand-soft);
+  border-radius: var(--radius-inner);
+}
+
+.agent-focus > svg { flex: 0 0 auto; }
+.agent-focus span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-focus small { margin-left: 8px; color: var(--muted); font-weight: 400; }
+
+.agent-focus button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.agent-focus button:hover { background: var(--surface); }
+
+@media (hover: none) { .agent-focus button { width: 32px; height: 32px; } }

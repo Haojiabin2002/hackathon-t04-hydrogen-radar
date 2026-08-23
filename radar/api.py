@@ -1081,6 +1081,8 @@ class ChatIn(BaseModel):
 class AgentIn(BaseModel):
     goal: str
     max_steps: int | None = None
+    # 界面上选中的线索。给了就直接进上下文，省掉模型先调一次 get_lead 的往返。
+    lead_id: int | None = None
 
 
 class PreferenceIn(BaseModel):
@@ -1109,7 +1111,7 @@ def run_agent(body: AgentIn, request: Request):
     steps = body.max_steps if body.max_steps else ag.MAX_STEPS
     steps = max(1, min(int(steps), 12))
     try:
-        return ag.run(goal, max_steps=steps)
+        return ag.run(goal, max_steps=steps, lead_id=body.lead_id)
     except LLMUnavailable as e:
         raise HTTPException(status_code=503, detail=f"LLM 通道不可用：{e}")
     except ValueError as e:
@@ -1162,7 +1164,8 @@ async def run_agent_stream(body: AgentIn, request: Request):
     def worker():
         try:
             import agent as ag
-            q.put(("done", ag.run(goal, max_steps=steps, on_step=on_step)))
+            q.put(("done", ag.run(goal, max_steps=steps, on_step=on_step,
+                                  lead_id=body.lead_id)))
         except _Cancelled:
             pass                       # 正常取消，不当错误上报
         except Exception as e:         # 含 LLMUnavailable

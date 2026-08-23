@@ -40,10 +40,12 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [actionStatus, setActionStatus] = useState<{ messageId: string; message: string; error?: boolean } | null>(null);
   const [agentRunning, setAgentRunning] = useState(false);
-  const mode = searchParams.get('mode') === 'agent' ? 'agent' : 'chat';
+  // 默认就是 Agent。问答模式退为 ?mode=chat 的快捷单轮通道——
+  // 它的优势只剩"一次调用就出结果"，能力上已被 Agent 完全覆盖。
+  const mode = searchParams.get('mode') === 'chat' ? 'chat' : 'agent';
   const setMode = (next: 'chat' | 'agent') => {
     const params = new URLSearchParams(searchParams);
-    if (next === 'agent') params.set('mode', 'agent');
+    if (next === 'chat') params.set('mode', 'chat');
     else params.delete('mode');
     setSearchParams(params, { replace: true });
   };
@@ -132,9 +134,13 @@ export default function AssistantPage() {
           <section className="panel chat-panel">
             <div className="panel-head">
               <div>
-                <h2>{mode === 'agent' ? 'Agent 模式' : activeLead ? `商机 #${activeLead.id} 溯源对话` : '全局看板对话'}</h2>
+                <h2>{mode === 'agent'
+                  ? (activeLead ? `Agent · 聚焦商机 #${activeLead.id}` : 'Agent')
+                  : activeLead ? `商机 #${activeLead.id} 溯源对话` : '全局看板对话'}</h2>
                 <p>{mode === 'agent'
-                  ? '给一个目标，它自己决定调哪些工具、何时收敛'
+                  ? (activeLead
+                      ? '这条线索的档案与公告原文已在上下文里，可直接提问'
+                      : '给一个目标，它自己决定调哪些工具、何时收敛')
                   : activeLead ? activeLead.company || activeLead.signal_title : '回答可引用当前真实商机编号'}</p>
               </div>
               <div className="flex-c" style={{ gap: 8 }}>
@@ -158,7 +164,12 @@ export default function AssistantPage() {
             </div>
 
             {mode === 'agent'
-              ? <AgentPanel leads={leads.data ?? []} onRunningChange={setAgentRunning} />
+              ? <AgentPanel
+                  leads={leads.data ?? []}
+                  focusLead={activeLead}
+                  onClearFocus={() => setSearchParams({}, { replace: true })}
+                  onRunningChange={setAgentRunning}
+                />
               : (<>
             <div className="message-list" aria-live="polite">
               {messages.length === 0 && !chat.isPending && (

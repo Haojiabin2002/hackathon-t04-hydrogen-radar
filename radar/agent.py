@@ -38,6 +38,10 @@ _TRANSIENT = re.compile(
 # 配置缺失、未登录、401 这类重试一百次也一样，重试只会白烧时间和步数
 MAX_TRANSIENT_RETRIES = 2
 
+# 单次工具结果喂回模型的字符上限。给足余量：list_sources 全量约 1900 字符，
+# get_lead 带原文摘录更长。超了会显式标注截断，不静默丢。
+OBSERVATION_LIMIT = 4000
+
 
 def _is_transient(detail: str) -> bool:
     return bool(_TRANSIENT.search(detail))
@@ -48,7 +52,7 @@ SYSTEM = """你是氢璞创能的销售研判 Agent，在「氢能商机雷达�
 给出可执行的判断。你没有文件系统、没有 shell、不能上网——只能通过下面的工具访问本系统的数据。
 
 {harness_context}
-
+{focus}
 {tool_catalog}
 
 工作方式：
@@ -58,6 +62,8 @@ SYSTEM = """你是氢璞创能的销售研判 Agent，在「氢能商机雷达�
 
 铁律：
 - **不许编造**。工具没返回的东西就是不知道，直说"系统里没有"，不要补全。
+- **不许自己数数**。工具返回里带 summary / 计数字段的，直接引用那个数字，
+  不要去数清单里有几项——你会数错。没有现成计数的就说"清单如下"，不要硬给总数。
 - 引用线索必须带 #ID，方便销售点开核对。
 - 涉及具体公告事实时，优先用 get_lead 拿原文摘录核对，不要只依赖评分理由。
 - 区分「公告实证」与「系统推断」：线索里 region_trace / company_trace 为 inferred 的字段
@@ -80,7 +86,30 @@ action 可选，用于建议界面执行一个动作，只允许：
 """
 
 
-def run(goal, max_steps=MAX_STEPS, on_step=None):
+def _focus_block(lead_id):
+    """把用户在界面上选中的那条线索直接放进上下文。
+
+    不这么做的话，模型得先花一步调 get_lead 才知道在说哪条——
+    多一次模型往返（约 7 秒），而这条信息用户在界面上已经明确指定了。
+    复用 get_lead 工具而不是自己写 SQL，保证和工具返回的是同一份数据。
+    """
+    out = tools.execute("get_lead", {"id": lead_id})
+    if not out.get("ok"):
+        return (f"\n<focus_lead>\n用户指定聚焦线索 #{lead_id}，但读取失败："
+                f"{out.get('error')}。据实告知，不要猜这条线索的内容。\n</focus_lead>\n")
+    d = out["result"]
+    keep = ("id", "company", "region", "score", "score_reason", "matched_product",
+            "match_reason", "signal_type", "power_range", "amount", "deadline",
+            "industry", "signal_title", "source", "source_url", "published_at",
+            "corroboration", "excerpt", "card")
+    body = {k: d.get(k) for k in keep if d.get(k) not in (None, "")}
+    return ("\n<focus_lead>\n用户在界面上选中了这条线索，优先围绕它回答；"
+            "需要别的线索再用工具查。\n"
+            + json.dumps(body, ensure_ascii=False, indent=1)
+            + "\n</focus_lead>\n")
+
+
+def run(goal, max_steps=MAX_STEPS, on_step=None, lead_id=None):
     """跑一轮 agent。返回 {answer, action, trace, steps}。
 
     on_step: 可选回调，每步执行完调用一次，用于流式展示。
@@ -91,6 +120,7 @@ def run(goal, max_steps=MAX_STEPS, on_step=None):
 
     base = SYSTEM.format(
         harness_context=harness.context_block(),
+        focus=_focus_block(lead_id) if lead_id else "",
         tool_catalog=tools.catalog_block(),
         goal=goal[:600],
     )
@@ -188,9 +218,19 @@ def run(goal, max_steps=MAX_STEPS, on_step=None):
         if on_step:
             on_step(entry)
 
+        # 观察截断必须**显式告知**。原来是静默切 1200 字符：
+        # list_sources 返回 1887 字符，模型只看到前 3 个源、还是从 JSON 中间硬切的，
+        # 然后把半份数据当全份用。截断本身难免（context 有限），
+        # 但模型必须知道"这里被切了"，才会选择再查一次而不是照着残缺数据回答。
+        if len(payload) > OBSERVATION_LIMIT:
+            shown = (f"{payload[:OBSERVATION_LIMIT]}\n"
+                     f"…〔结果过长，已截断；完整长度 {len(payload)} 字符。"
+                     f"缺的部分请缩小查询范围重查，不要拿这半份当全部〕")
+        else:
+            shown = payload
         transcript.append(
             f"[第{step}步] 调用 {name}({json.dumps(args, ensure_ascii=False)})\n"
-            f"        结果：{payload[:1200]}")
+            f"        结果：{shown}")
 
     # 步数用完还没收敛，如实报告，不编一个结论出来
     return {

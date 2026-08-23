@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle, Bot, CheckCircle2, CircleStop, Send, ShieldCheck, Wrench,
+  AlertTriangle, Bot, CheckCircle2, CircleStop, Send, ShieldCheck, Target, Wrench, X,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiGet, apiMutation } from '../../api/client';
@@ -50,6 +50,13 @@ function actionLabel(action: ChatAction) {
   return '保存这条销售偏好';
 }
 
+const FOCUS_GOALS = [
+  '这条为什么得这个分？逐维拆开说',
+  '我们的产品补的是它的哪个模块？',
+  '这单该打给谁？需要穿透中间层吗？',
+  '推进这条最可能踩的坑是什么？',
+];
+
 const PRESET_GOALS = [
   '按我的偏好挑三条今天最该打电话的线索，说明理由',
   '评分最高的那条，我们的产品补的是它的哪个模块？',
@@ -57,8 +64,11 @@ const PRESET_GOALS = [
   '当前漏斗哪一步损耗最大？给出可执行的改进建议',
 ];
 
-export function AgentPanel({ leads, onRunningChange }: {
+export function AgentPanel({ leads, focusLead, onClearFocus, onRunningChange }: {
   leads: Lead[];
+  /** 界面上选中的线索。给了就直接进 agent 上下文，省掉一次 get_lead 往返 */
+  focusLead?: Lead;
+  onClearFocus?: () => void;
   /** 把运行状态报给外层，好让它在跑的时候禁掉模式切换 */
   onRunningChange?: (running: boolean) => void;
 }) {
@@ -110,7 +120,7 @@ export function AgentPanel({ leads, onRunningChange }: {
     try {
       await postSse<AgentStep | AgentResult | { detail: string }>(
         '/api/agent/stream',
-        { goal: clean, max_steps: 8 },
+        { goal: clean, max_steps: 8, lead_id: focusLead?.id ?? null },
         {
           onEvent: (event, data) => {
             if (event === 'step') {
@@ -146,7 +156,7 @@ export function AgentPanel({ leads, onRunningChange }: {
         elapsed: (Date.now() - cur.startedAt) / 1000,
       } : cur);
     }
-  }, [queryClient]);
+  }, [queryClient, focusLead?.id]);
 
   const stop = () => {
     abortRef.current?.abort();
@@ -204,11 +214,26 @@ export function AgentPanel({ leads, onRunningChange }: {
         </span>
       </div>
 
+      {focusLead && (
+        <div className="agent-focus">
+          <Target size={13} aria-hidden="true" />
+          <span>
+            聚焦 <b>#{focusLead.id}</b> {focusLead.company || focusLead.signal_title}
+            <small>档案与公告原文已在上下文里</small>
+          </span>
+          {onClearFocus && (
+            <button type="button" onClick={onClearFocus} aria-label="退出聚焦，回到全局">
+              <X size={12} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="message-list" ref={scrollRef} aria-live="polite">
         {!run && (
           <div className="empty-state">
             <Bot size={29} aria-hidden="true" />
-            <h2>给 Agent 一个目标</h2>
+            <h2>{focusLead ? `围绕商机 #${focusLead.id} 提问` : '给 Agent 一个目标'}</h2>
             <p>它会自己决定调哪些工具、调几次、何时收敛，每一步都会显示出来供你复盘。通常需要 1–3 分钟。</p>
           </div>
         )}
@@ -290,7 +315,7 @@ export function AgentPanel({ leads, onRunningChange }: {
 
       {!run && (
         <div className="panel-body quick-list" style={{ paddingTop: 0 }}>
-          {PRESET_GOALS.map((preset) => (
+          {(focusLead ? FOCUS_GOALS : PRESET_GOALS).map((preset) => (
             <button type="button" className="filter-chip" key={preset} onClick={() => setGoal(preset)}>
               {preset}
             </button>
@@ -301,7 +326,9 @@ export function AgentPanel({ leads, onRunningChange }: {
       <form className="composer is-agent" onSubmit={submit}>
         <textarea
           aria-label="给 Agent 一个目标"
-          placeholder="例如：按我的偏好挑三条今天最该打电话的线索，说明理由"
+          placeholder={focusLead
+            ? `围绕商机 #${focusLead.id} 提问，例如：这条为什么得 ${focusLead.score ?? '这个'} 分？`
+            : '例如：按我的偏好挑三条今天最该打电话的线索，说明理由'}
           value={goal}
           onChange={(event) => setGoal(event.target.value)}
           disabled={running}

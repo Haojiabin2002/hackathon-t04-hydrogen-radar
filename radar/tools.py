@@ -150,6 +150,57 @@ def t_run_skill(args):
     return {"skill": key, "lead_id": lid, "answer": ask(prompt, expect_json=False)[:3000]}
 
 
+def t_get_schedule(args):
+    """自动任务状态。
+
+    调度快照 `_collect` 是 api.py 里的**内存**字典（有锁保护），没有落盘文件可读，
+    所以只能从 api 模块取。这里用惰性导入：工具在请求期执行，那时 api 已经在
+    sys.modules 里，不会有循环导入问题。直接调 collect_status() 而不是自己
+    重读一遍配置，这样 agent 报的状态和界面顶栏显示的**必然一致**。
+    """
+    import api
+    s = api.collect_status()
+    r = s.get("last_result") or {}
+    return {
+        "schedule_enabled": s.get("schedule_enabled"),
+        "run_hours": s.get("run_hours"),
+        "next_at": s.get("next_at"),
+        "running": s.get("running"),
+        "last_at": s.get("last_at"),
+        "last_error": s.get("last_error"),
+        # last_result 里还有 crawler_tail 这类几十行的进程输出，
+        # 喂给模型没用还占 context，只挑判断得上的三项
+        "last_added": r.get("crawler_added"),
+        "last_source_errors": r.get("source_errors"),
+        "last_pipeline": r.get("pipeline"),
+    }
+
+
+def t_list_sources(args):
+    """信源清单与各自入库条数。直接复用 api 的读取，避免口径漂移。
+
+    ⚠️ 必须**预先聚合**再返回：只给一个 8 项的清单让模型自己数，它会数错——
+    实测一次「8 个源 4 启用」被模型总结成「6 个源 3 启用」。
+    get_stats 从一开始就是预聚合的，所以它报的数字一直准。同一条原则：
+    **能让代码算的，绝不让模型数。**
+    """
+    import api
+    rows = api.list_sources()
+    real = [s for s in rows if s["key"] != "__orphan__"]
+    enabled = [s for s in real if s["enabled"]]
+    return {
+        "summary": {
+            "total": len(real),
+            "enabled": len(enabled),
+            "disabled": len(real) - len(enabled),
+            "signals_total": sum(s["signals"] for s in rows),
+            "enabled_names": [s["name"] for s in enabled],
+            "disabled_names": [s["name"] for s in real if not s["enabled"]],
+        },
+        "sources": rows,
+    }
+
+
 def t_read_memory(args):
     return {"memory": [m.get("content") for m in harness.read_memory()]}
 
@@ -212,6 +263,18 @@ REGISTRY = {
         "fn": t_run_skill, "confirm": False,
         "desc": "在某条线索上执行一个技能，返回分析文本。会真实调一次模型，别滥用。",
         "args": {"key": "技能 key", "lead_id": "线索 ID"},
+    },
+    "get_schedule": {
+        "fn": t_get_schedule, "confirm": False,
+        "desc": "自动任务状态：是否启用、每天几点跑、下次计划时间、上次运行结果与错误。"
+                "回答「链路健康吗」「下次什么时候采集」这类问题必须先查这个，不要猜。",
+        "args": {},
+    },
+    "list_sources": {
+        "fn": t_list_sources, "confirm": False,
+        "desc": "信源清单：每个源的名称、启用状态、抓取配额、停用原因、已入库条数。"
+                "回答「为什么某类线索少」「覆盖了哪些网站」必须先查这个。",
+        "args": {},
     },
     "read_memory": {
         "fn": t_read_memory, "confirm": False,
