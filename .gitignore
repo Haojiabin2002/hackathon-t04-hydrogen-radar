@@ -38,3 +38,4 @@ frontend/dist/
 .env.local
 CLAUDE.local.md
 .claude/settings.local.json
+
