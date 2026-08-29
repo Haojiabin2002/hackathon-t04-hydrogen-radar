@@ -27,6 +27,9 @@ frontend/dist/
 # 本地设计走查截图（规范文档可提交，截图不占仓库体积）
 .impeccable/review/
 
+# 本地隔离开发工作区
+.worktrees/
+
 # 编辑器 / 系统
 .DS_Store
 .idea/
@@ -38,4 +41,3 @@ frontend/dist/
 .env.local
 CLAUDE.local.md
 .claude/settings.local.json
-
