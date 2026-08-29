@@ -1,4 +1,5 @@
 import { ApiError } from './client';
+import { readAdminToken, requestAdminToken, writeAdminToken } from './adminToken';
 
 /**
  * SSE 消费器。
@@ -16,16 +17,6 @@ export interface SseHandlers<T = unknown> {
 }
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
-const adminTokenKey = 'hydrogen-radar-admin-token';
-
-function savedAdminToken(): string {
-  if (typeof window === 'undefined') return '';
-  try {
-    return window.sessionStorage.getItem(adminTokenKey)?.trim() ?? '';
-  } catch {
-    return '';
-  }
-}
 
 /**
  * 向一个 SSE 端点 POST 并逐事件回调。
@@ -58,7 +49,7 @@ export async function postSse<T = unknown>(
 
   let response: Response;
   try {
-    response = await attempt(savedAdminToken());
+    response = await attempt(readAdminToken());
   } catch (error) {
     if ((error as Error)?.name === 'AbortError') return;
     throw error;
@@ -68,13 +59,9 @@ export async function postSse<T = unknown>(
   // 少了这段，配了 RADAR_ADMIN_TOKEN 的线上实例上 Agent 模式会 100% 不可用，
   // 而 README 明确承诺过"调用模型时前端会要求管理员口令"。
   if (response.status === 401 && typeof window !== 'undefined') {
-    const supplied = window.prompt('该操作需要管理员口令。口令只保存在当前浏览器会话中。')?.trim();
+    const supplied = (await requestAdminToken())?.trim();
     if (supplied) {
-      try {
-        window.sessionStorage.setItem(adminTokenKey, supplied);
-      } catch {
-        // 隐私模式下存不进去，本次请求仍可完成
-      }
+      writeAdminToken(supplied);
       try {
         response = await attempt(supplied);
       } catch (error) {
