@@ -127,14 +127,18 @@ def _overseas_source_keys():
 def list_leads():
     conn = connect()
     rows = conn.execute(
-        "SELECT l.id, l.signal_id, l.company, l.signal_type, l.power_range,"
+        "SELECT l.id, l.signal_id, l.company, l.subject, l.signal_type, l.power_range,"
         " l.region, l.amount, l.deadline, l.score, l.score_reason,"
         " l.matched_product, l.match_reason, l.industry,"
         " l.status, l.dup_of, l.corroboration,"
         " s.title AS signal_title, s.source AS source,"
         " s.source_url AS source_url, s.fetched_at AS fetched_at,"
         " s.published_at AS published_at, s.raw_text AS _raw,"
-        " (SELECT COUNT(*) FROM cards c WHERE c.lead_id=l.id) AS has_card"
+        " (SELECT COUNT(*) FROM cards c WHERE c.lead_id=l.id) AS has_card,"
+        # 一条招投标汇总贴能拆出十几条商机，它们的 signal_title 一字不差。
+        # 前端要能说清「这是这篇公告里的第几条标的」，否则列表看上去全是重复。
+        " (SELECT COUNT(*) FROM leads sib WHERE sib.signal_id=l.signal_id"
+        "  AND sib.status!='duplicate') AS siblings"
         " FROM leads l JOIN signals s ON s.id=l.signal_id"
         " WHERE l.status!='duplicate'"
         " ORDER BY (l.score IS NULL), l.score DESC, l.id DESC").fetchall()
@@ -238,6 +242,15 @@ def stats():
         # 已抓取但尚未进入研判管线的信号，账面要如实反映覆盖率
         "pending": q("SELECT COUNT(*) FROM signals s"
                      " WHERE NOT EXISTS (SELECT 1 FROM leads l WHERE l.signal_id=s.id)"),
+        # 「信号数」与「商机数」不是加和关系，也不是一一对应：一条招投标汇总贴
+        # 一页里就有十几个互不相干的标的，会合法地拆成十几条商机。
+        # 不给出下面两个数，看板上「460 条公告 / 145 条商机」就会被读成漏斗残留率，
+        # 路演现场对不上账。
+        "lead_signals": q("SELECT COUNT(DISTINCT signal_id) FROM leads"
+                          " WHERE status='new'"),
+        "multi_lead_signals": q(
+            "SELECT COUNT(*) FROM (SELECT signal_id FROM leads WHERE status='new'"
+            " GROUP BY signal_id HAVING COUNT(*)>1)"),
         "matched": q("SELECT COUNT(*) FROM leads"
                      " WHERE status='new' AND length(coalesce(matched_product,''))>0"),
         # 只数看得见的卡：线索被归并为重复后，它的卡在界面上已不可达，

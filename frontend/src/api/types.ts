@@ -11,6 +11,9 @@ export interface Lead {
   id: number;
   signal_id: number;
   company: string | null;
+  /** 标的物一句话描述。一条招投标汇总贴会合法地拆出多条商机，
+   *  那时 signal_title 完全相同、company 还常常为空，只有 subject 能把它们区分开。 */
+  subject: string | null;
   signal_type: string | null;
   power_range: string | null;
   region: string | null;
@@ -30,6 +33,8 @@ export interface Lead {
   fetched_at: string | null;
   published_at: string | null;
   has_card: number;
+  /** 同一条公告拆出的可见商机总数（含自己）。>1 表示这是一篇多标的汇总贴。 */
+  siblings: number;
   region_trace: TraceStatus;
   region_unsourced: string[];
   company_trace: TraceStatus;
@@ -62,6 +67,10 @@ export interface RadarStats {
   cards_orphan: number;
   high: number;
   overseas: number;
+  /** 产出了在研商机的公告数。leads 与它不相等——一条汇总贴能拆出多条商机。 */
+  lead_signals: number;
+  /** 其中拆出了不止一条商机的公告数。 */
+  multi_lead_signals: number;
 }
 
 export interface SourceSummary {

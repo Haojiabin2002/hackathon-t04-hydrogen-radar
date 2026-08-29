@@ -150,6 +150,20 @@ def t_run_skill(args):
     return {"skill": key, "lead_id": lid, "answer": ask(prompt, expect_json=False)[:3000]}
 
 
+def t_get_pipeline_status(args):
+    """各环节积压量。惰性 import pipeline：避免 tools 被 api/agent 加载时
+    连带拖起 llm/yaml；口径唯一来源是 pipeline.stage_backlog，这里不许自己写 SQL。"""
+    threshold = _need(args, "threshold", int, default=80, required=False)
+    from pipeline import stage_backlog
+    b = stage_backlog(threshold=threshold)
+    b["summary"] = (
+        f"待抽取公告 {b['extract']} 条；含多条目标记的汇总贴候选 {b['backfill']} 篇"
+        f"（补抽只增不改；防重是启发式，残余重复由归并环节兜底）；待配型 {b['match']} 条；"
+        f"达标未出卡 {b['cards']} 条（分数线 {b['threshold']}）；"
+        f"在研线索共 {b['new_total']} 条，公告库共 {b['signals_total']} 条。")
+    return b
+
+
 def t_get_schedule(args):
     """自动任务状态。
 
@@ -263,6 +277,12 @@ REGISTRY = {
         "fn": t_run_skill, "confirm": False,
         "desc": "在某条线索上执行一个技能，返回分析文本。会真实调一次模型，别滥用。",
         "args": {"key": "技能 key", "lead_id": "线索 ID"},
+    },
+    "get_pipeline_status": {
+        "fn": t_get_pipeline_status, "confirm": False,
+        "desc": "各管线环节的积压量：待抽取公告 / 汇总贴候选 / 待配型 / 达标未出卡。"
+                "纯查库不花模型调用。回答「现在压着多少活」「链路堵在哪一环」必须先查这个，不要猜。",
+        "args": {"threshold": "可选整数 0-100，出卡分数线，默认 80"},
     },
     "get_schedule": {
         "fn": t_get_schedule, "confirm": False,

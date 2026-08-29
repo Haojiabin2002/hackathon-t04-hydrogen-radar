@@ -1,18 +1,36 @@
 # 氢能商机雷达 MVP · 进度记录
 
 LLM_MODE: live
-LLM_CHANNEL: claude_cli（本机 claude CLI 子进程，走订阅额度）
-LLM_CHANNEL_NOTE: 2026-08-18 在终端完成登录后，CLI 通道已实测跑通全链路，不再依赖会话内子 Agent。
-  2026-08-19 起通道可配置，三选一，进「模型通道」页会先做一次快速探测：
-    · claude_cli — 本机已装已登录，当前在用
-    · codex_cli  — 本机未安装，界面如实标注，未安装即不可选
-    · api        — OpenAI 兼容 / Anthropic 原生。**2026-08-23 起内置演示密钥**：
-                   接入点 api.openai-next.com/v1，模型 claude-sonnet-5，常量写在 llm.py 的
-                   BUILTIN_API 里，随仓库分发，clone 或部署后零配置即可跑通全链路。
-                   覆盖顺序：BUILTIN_API < ~/.config/hydrogen-radar/llm.json（0600）< RADAR_LLM_* 环境变量，
-                   所以线上换 key 设 RADAR_LLM_API_KEY 即可，不必改代码。
-                   ⚠️ 密钥在 git 历史中永久存在，仓库私有；演示结束后请轮换。
-  切换通道时服务端会自己再实测一次，测不过就不保存；不做任何通道间自动降级。
+LLM_CHANNEL: api（赞助线路1 · claude-opus-5 · Anthropic 原生风格 · 思考档 max）
+LLM_CHANNEL_NOTE: 2026-08-29 接入赛事赞助方提供的三把 demo key，统称线路1/2/3。
+  三把 key 指向同一个中转 api.openai-next.com，实测账号可见模型清单完全一致
+  （各 648 个，三份清单 MD5 相同），所以「线路」只换额度池，不换模型、不换打分口径。
+    · 线路1 额度 $500（已用 $31.15）— 当前在用
+    · 线路2 额度 $100（全新）
+    · 线路3 额度 $300（全新）
+  ⚠️ 三把 key 的 access_until 均为 1788019200 = 2026-08-30 00:00（北京时间）到期。
+  ⚠️ 线路1 那把 key 在 2026-08-23~08-29 期间以明文形式写在 llm.py 的 BUILTIN_API 里，
+     已进入 git 历史且无法靠改当前文件删除；仓库虽私有但协作者与评委可见，赛后必须作废。
+     现在 key 一律不进仓库，只存 ~/.config/hydrogen-radar/llm.json（0600），
+     用 `python llm.py --import-routes` 从 stdin 导入（不走 argv，argv 同机可见）。
+  覆盖顺序：线路元数据 < ~/.config/hydrogen-radar/llm.json < RADAR_LLM_* 环境变量。
+
+LLM_THINKING: max（budget_tokens=32000）· 2026-08-29 实测生效
+  判定只认硬证据（响应里有非空 thinking/reasoning_content 块，或 usage.reasoning_tokens>0）；
+  请求里发了参数但响应没有痕迹的，一律记为「未生效」，不得宣称已开启。
+    · Anthropic 原生 /v1/messages + thinking{budget_tokens}
+        claude-opus-5 → ✅ 真实 thinking 块（health_check 实测 180 字）
+    · OpenAI 兼容 /v1/chat/completions + reasoning_effort=high
+        claude-opus-5 / claude-opus-4-8 / o3-pro / gpt-5.4-pro / gpt-5.6-terra → ❌ 无任何痕迹
+        claude-opus-4-7-thinking（名字自带后缀）→ ✅ reasoning_content 358 字
+        gemini-3.1-pro / deepseek-v4-pro / kimi-k3 / qwen3.5-plus / glm-5.3
+        / doubao-seed-2-0-pro → ✅ reasoning_tokens 27~250
+  所以顶配 Claude 想开思考只能走 anthropic 风格——这推翻了 08-23 那版
+  「该中转拿不到扩展思考」的结论，那句话只对 OpenAI 兼容端点成立。
+  budget 是上限不是目标：2048→60000 六档全部 HTTP 200，实际思考量 141~455 字随机波动，
+  不随预算单调增长，调高档位不会线性烧钱。
+  切换通道时服务端会自己再实测一次，测不过就不保存；不做任何通道间自动降级，
+  线路之间也不自动切换——额度耗尽必须由人显式换线路，否则「跑通了」会掩盖额度问题。
   CLI 子进程已加固（禁全部工具 + 禁 MCP + 空临时目录 + 最小环境变量 + prompt 走 stdin），
   并有隔离探针实测把关：探针读得到目录外的口令或执行得了 shell，该通道即拒绝启用。
 

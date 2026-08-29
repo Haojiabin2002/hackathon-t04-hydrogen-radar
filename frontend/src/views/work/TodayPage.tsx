@@ -91,6 +91,9 @@ function leadStatusLabel(status?: string) {
 
 export default function TodayPage() {
   const [selectedSignalId, setSelectedSignalId] = useState<number | null>(null);
+  // 汇总贴一页多标的时，研判单当前展示的是哪一条。
+  // 存 id 而不是下标：切换信号后旧 id 自然落空、回落到第一条，不必额外重置。
+  const [activeLeadId, setActiveLeadId] = useState<number | null>(null);
   const decisionPanelRef = useRef<HTMLElement | null>(null);
   const stats = useQuery({ queryKey: ['stats'], queryFn: () => apiGet<RadarStats>('/api/stats') });
   const leads = useQuery({ queryKey: ['leads'], queryFn: () => apiGet<Lead[]>('/api/leads') });
@@ -106,9 +109,14 @@ export default function TodayPage() {
     .sort((a, b) => String(b.published_at || b.fetched_at || '').localeCompare(String(a.published_at || a.fetched_at || '')));
   const visibleSignals = sortedSignals.slice(0, 18);
   const selectedSignal = sortedSignals.find((signal) => signal.id === selectedSignalId) ?? visibleSignals[0] ?? null;
-  const selectedLead = selectedSignal
-    ? (leads.data ?? []).find((lead) => lead.signal_id === selectedSignal.id) ?? null
-    : null;
+  // 一条公告可以合法地拆出多条商机（招投标汇总贴一页十几个标的），
+  // 所以这里必须取全部而不是 find 第一条——早先用 find，
+  // 选中那条 12 个标的的汇总贴时界面只显示 1 条、静默吞掉另外 11 条。
+  const selectedLeads = selectedSignal
+    ? (leads.data ?? []).filter((lead) => lead.signal_id === selectedSignal.id)
+    : [];
+  const selectedLead = selectedLeads.find((lead) => lead.id === activeLeadId)
+    ?? selectedLeads[0] ?? null;
   const selectedExcerptHasEncodingIssue = hasTextEncodingIssue(selectedSignal?.excerpt);
   const rankedLeads = [...(leads.data ?? [])]
     .filter((lead) => lead.status !== 'rejected' && lead.status !== 'duplicate')
@@ -161,7 +169,12 @@ export default function TodayPage() {
       value: stats.data?.leads,
       unit: '条进入队列',
       state: stats.data?.leads ? 'ready' : channelBlocked ? 'blocked' : 'waiting',
-      detail: stats.data?.high ? `${stats.data.high} 条高价值` : '等待命中',
+      // 商机数与公告数不是加和关系：一条招投标汇总贴一页含多个互不相干的标的，
+      // 会拆成多条商机。不写明这一点，「460 条公告 → 145 条商机」会被读成
+      // 漏斗残留率，路演现场对不上账。
+      detail: stats.data?.multi_lead_signals
+        ? `出自 ${stats.data.lead_signals} 条公告，其中 ${stats.data.multi_lead_signals} 条含多个标的`
+        : stats.data?.high ? `${stats.data.high} 条高价值` : '等待命中',
     },
     {
       label: '作战卡',
@@ -302,7 +315,9 @@ export default function TodayPage() {
               <span className="trade-panel-icon"><FileCheck2 size={16} aria-hidden="true" /></span>
               <div>
                 <h2 id="trade-decision-title">选中信号研判单</h2>
-                <p>信号、判断与商机记录一一对应</p>
+                {/* 早先这里写「信号、判断与商机记录一一对应」。招投标汇总贴一页
+                    含多个互不相干的标的、会拆成多条商机，一一对应不成立。 */}
+                <p>每条商机都可回到公告原文核对</p>
               </div>
             </div>
             <Link to="/opportunities">商机看板<ArrowUpRight size={14} aria-hidden="true" /></Link>
@@ -335,6 +350,27 @@ export default function TodayPage() {
                     {selectedLead ? leadStatusLabel(selectedLead.status) : channelBlocked ? '研判受阻' : '未形成商机'}
                   </span>
                 </header>
+
+                {selectedLeads.length > 1 && (
+                  <div className="trade-review-targets" role="group" aria-label="本篇公告的多个标的">
+                    <span>本篇公告含 {selectedLeads.length} 个标的</span>
+                    <div className="trade-review-target-list">
+                      {selectedLeads.map((lead, i) => (
+                        <button
+                          key={lead.id}
+                          type="button"
+                          className={`trade-review-target ${lead.id === selectedLead?.id ? 'trade-target-active' : ''}`}
+                          aria-pressed={lead.id === selectedLead?.id}
+                          onClick={() => setActiveLeadId(lead.id)}
+                          title={lead.subject || lead.company || `商机 #${lead.id}`}
+                        >
+                          <em>{i + 1}</em>
+                          {lead.subject || lead.company || `商机 #${lead.id}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {selectedLead ? (
                   <>

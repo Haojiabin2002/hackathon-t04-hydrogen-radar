@@ -19,6 +19,10 @@ CREATE TABLE IF NOT EXISTS leads (
     signal_id       INTEGER NOT NULL,
     company         TEXT,
     signal_type     TEXT,
+    -- 标的物一句话描述。一条公告（尤其招投标汇总贴）可以合法地拆出多条商机，
+    -- 此时 company/title 常常相同或为空，subject 是唯一能把它们区分开的字段。
+    -- 缺了它：归并阶段会把同页的不同标的误并成一条，界面也只能显示重复的标题。
+    subject         TEXT,
     power_range     TEXT,
     region          TEXT,
     amount          TEXT,
@@ -55,6 +59,7 @@ MIGRATIONS = [
     ("leads", "dup_of", "INTEGER"),
     ("leads", "corroboration", "TEXT"),
     ("leads", "industry", "TEXT"),
+    ("leads", "subject", "TEXT"),
 ]
 
 

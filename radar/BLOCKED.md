@@ -48,6 +48,41 @@ CLI 子进程加固与隔离探针见 PROGRESS.md 顶部。本项关闭。
 
 ---
 
+## 【三】管线环节的「提议→确认→执行」回路（待两侧对齐，2026-08-29 提出）
+
+**目标**：让助手页的 Agent 能像调度采集那样调度单个管线环节
+（抽取 / 补抽 / 配型 / 出卡），形成「给目标 → 员工查积压 → 提议跑环节 →
+人点确认 → 执行 → 汇报」的完整体验。死规矩 4 判定：触发管线环节属外部副作用
+（写业务三表 + 花模型额度），必须走 confirm 提案通道，与 trigger_collect 同型。
+
+**数据侧待做（@Haojiabin2002，契约定稿后动工）：**
+- tools.py 注册 4 个提案工具：`run_extract` / `run_backfill` / `run_match` / `run_cards`
+  （`fn=None, confirm=True`，仿 trigger_collect 先例）
+- agent.py：工具调用特判 → `proposed_action={"type":"run_stage","stage":…,"limit":…}`；
+  `_ACTIONS` 增加 `run_stage`；SYSTEM 动作清单同步（注意 proposed_action 单槽位）
+
+**呈现侧待做（@MristYun）：**
+- api.py：新增单环节执行端点（建议 `POST /api/pipeline/{stage}`，
+  复用现成的 `_run_stage` 子进程原语；需检查采集器状态防止与定时 `pipeline.py all` 撞车——
+  两个进程并行消费同一待办队列会重复入库）
+- frontend：`types.ts` 的 ChatAction 判别联合加 `run_stage` 型；
+  AssistantPage / AgentPanel 两份 actionLabel / runAction 加分支
+  （现状 else 兜底会把未知 action 误标成「保存偏好」并误发 /api/memory）；
+  `ArtAgentTrace.isGated` 从硬编码 `trigger_collect` 改为按
+  `/api/agent/tools` 的 `requires_confirm` 判定（否则新 confirm 工具被拦的步骤显示成红色失败）
+
+**顺序约定**：先对齐本契约 → 呈现侧端点与渲染落地 → 数据侧再注册工具
+（先注册会在界面上产生误导性红色失败步骤，演示期不可接受）。
+
+**附：同批审查确认的一个结构性缺口（2026-08-29）**——多标的抽取引入的
+`subject`（本条标的物）目前只喂给打分 prompt，**不落库**：配型、作战卡、归并
+三个环节拿到的是整页正文，同页多标的时无法确定自己在处理哪一条。
+根治要给 `leads` 加 `subject` 列，按 CLAUDE.md 三件套（SCHEMA + MIGRATIONS +
+写入代码）走，**需两人同意**。加列前的缓解：打分已拼【本条标的】进摘要；
+残余错配风险集中在同页多标的的高分线索出卡环节。
+
+---
+
 ## 其它待裁决项
 
 无。

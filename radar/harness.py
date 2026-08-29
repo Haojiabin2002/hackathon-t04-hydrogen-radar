@@ -187,6 +187,23 @@ def context_block():
         lines.append("（无已启用技能）")
     lines.append("</available_skills>")
 
+    lines.append("<pipeline_status>")
+    try:
+        # 惰性 import：harness 被 agent/api/tools 加载时不拖起 pipeline→llm 链。
+        # 口径唯一来源是 pipeline.stage_backlog（与 get_pipeline_status 工具同源），
+        # 这里不许自己写 SQL——两处数字打架比没有数字更糟。
+        from pipeline import stage_backlog
+        b = stage_backlog()
+        lines.append(
+            f"开场快照：待抽取公告 {b['extract']} 条｜汇总贴候选 {b['backfill']} 篇｜"
+            f"待配型 {b['match']} 条｜达标未出卡 {b['cards']} 条（≥{b['threshold']}分）｜"
+            f"在研 {b['new_total']} 条。此为对话开始时代码查库所得；"
+            "行动前用 get_pipeline_status 复核，不要凭这行快照下最终结论。")
+    except Exception as e:
+        # 查库失败如实说，绝不静默填 0——编一个数字比没有数字更糟。
+        lines.append(f"（管线状态不可读：{type(e).__name__}，需要时用 get_pipeline_status 重查）")
+    lines.append("</pipeline_status>")
+
     lines.append("<knowledge_sections>")
     lines.append("、".join(knowledge_sections()) or "（知识库不可读）")
     lines.append("用 read_knowledge 工具按节取用。")

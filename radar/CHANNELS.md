@@ -1,40 +1,204 @@
-# LLM 通道说明（实测结论，2026-08-14）
+# LLM 通道说明（实测结论）
 
-本项目的模型调用有两条通道，代码同一套，只是执行者不同。
+本项目的模型调用有三条通道，代码同一套，只是执行者不同：
+`claude_cli`（走 Claude 订阅额度）、`codex_cli`（走 ChatGPT 订阅额度）、`api`（按量计费）。
 
-## 通道 A：CLI / SDK 子进程（`llm.py` + `pipeline.py`）——当前不可用
+**当前在用：`api` 通道 · 赞助线路1 · claude-opus-5 · Anthropic 原生风格 · 思考档 max。**
 
+---
+
+## 一、三条赞助线路（2026-08-29 接入）
+
+赛事赞助方提供三把 demo key，统称线路1/2/3，全部指向中转 `api.openai-next.com`。
+
+| 线路 | 额度 | 已用 | 余额 | 备注 |
+|---|---:|---:|---:|---|
+| 线路1 | $500 | $31.20 | $468.80 | 当前在用；**key 已泄露进 git 历史，赛后必须作废** |
+| 线路2 | $100 | $0.12 | $99.88 | 全新 |
+| 线路3 | $300 | $0.01 | $299.99 | 全新 |
+
+三把 key 的账号可见模型清单**完全一致**（各 648 个，三份排序后清单 MD5 相同），
+所以「线路」只换额度池，**不换模型、不换打分口径**——切线路不影响结果可复现性。
+
+⚠️ **有效期**：三把 key 的 `access_until` 均为 `1788019200`，
+即 **2026-08-30 00:00（北京时间）** 到期。这是中转自己返回的权威值
+（`GET /v1/dashboard/billing/subscription`），不是手工换算的。
+
+### key 的存放
+
+**不进仓库。** 只存 `~/.config/hydrogen-radar/llm.json`（0600），用 stdin 导入：
+
+```bash
+echo '{"1":"sk-...","2":"sk-...","3":"sk-..."}' | python llm.py --import-routes
 ```
-$ claude -p "回复两个字:通了"
-Not logged in · Please run /login
+
+走 stdin 不走 argv：argv 对同机任何用户可见，这是最常见的泄露口。
+
+历史教训：2026-08-23~08-29 期间线路1 的 key 以明文写在 `llm.py` 的 `BUILTIN_API` 常量里，
+目的是「clone 下来零配置就能跑」。代价是它永久进入 git 历史，改当前文件删不掉。
+仓库虽私有，但协作者与拿到访问权的评委都能看到。**赛后必须作废那把 key。**
+
+### 线路管理命令
+
+```bash
+python llm.py --routes              # 列出三条线路状态（只显示 key 末四位）
+python llm.py --use-route 2         # 切到线路2
+python llm.py --thinking high       # 改思考档并落盘
+python llm.py --test api            # 实测：一次调用同时验连通与思考是否生效
 ```
 
-Python `claude-agent-sdk` 走的是同一条路（内部 spawn `claude` 子进程），实测同样失败：
+**线路之间不自动切换。** 额度耗尽必须由人显式换线路——自动切会让「跑通了」掩盖额度问题，
+和项目「不做通道间自动降级」是同一条规矩。
 
-```
-AssistantMessage(content=[TextBlock(text='Not logged in · Please run /login')],
-                 model='<synthetic>', error='authentication_failed')
-```
+---
 
-**根因**：本机 Claude Code 会话的认证由宿主 app 通过 `CLAUDE_CODE_MESSAGING_SOCKET` +
-token 刷新机制提供，**不落盘、不随环境变量传给子进程**。已核对 SDK 源码
-（`_internal/transport/subprocess_cli.py:809`）确认它透传了除 `CLAUDECODE` 外的全部环境变量，
-仍然认证失败——证明 host auth 不经环境变量传递。
+## 二、思考档：哪些模型真能开出来（2026-08-29 逐条实测）
 
-**解除办法**：在交互式终端执行一次 `claude /login`，完成浏览器授权。
-凭据落盘后 `bash run.sh` 即可全自动跑通，无需人工干预。
+判定**只认硬证据**：响应里有非空 `thinking` / `reasoning_content` 块，
+或 `usage.completion_tokens_details.reasoning_tokens > 0`。
+请求里发了参数、但响应里没有痕迹的，一律记为**未生效**——
+参数被静默接受不等于思考开启，把它当成开启就是「把推断值伪装成实证值」。
 
-## 通道 B：会话内子 Agent（本次使用）
+### Anthropic 原生端点 `/v1/messages`
 
-在 Claude Code 会话内派子 Agent 完成抽取、评分、匹配、作战卡。
-子 Agent 是会话内通道，不受子进程认证限制。
+| 模型 | 参数 | 结果 |
+|---|---|---|
+| `claude-opus-5` | `thinking{type:enabled, budget_tokens:N}` | ✅ 真实 thinking 块 |
 
-- **是真实的 Claude 推理**，不是 mock、不是规则引擎、不是预置应答
-- 局限：需要会话在场，`run.sh` 无法脱离会话独立跑完这几步
+### OpenAI 兼容端点 `/v1/chat/completions`
 
-## 两条通道的产物一致性
+| 模型 | 参数 | 结果 |
+|---|---|---|
+| `claude-opus-5` / `claude-opus-4-8` | `reasoning_effort=high` | ❌ 无痕迹，usage 全 0 |
+| `o3-pro` / `gpt-5.4-pro` / `gpt-5.6-terra` | `reasoning_effort=high` | ❌ 无痕迹，usage 全 0 |
+| `claude-opus-4-7-thinking` | 模型名自带后缀 | ✅ `reasoning_content` 358 字 |
+| `gemini-3.1-pro-preview(-thinking)` | `reasoning_effort=high` | ✅ `reasoning_tokens` 186 / 188 |
+| `deepseek-v4-pro` | 同上 | ✅ 61 |
+| `kimi-k3` | 同上 | ✅ 27 |
+| `qwen3.5-plus` | 同上 | ✅ 250（但耗时 49s，明显慢） |
+| `glm-5.3` | 同上 | ✅ 43 |
+| `doubao-seed-2-0-pro-260215` | 同上 | ✅ 43 |
 
-两者用的是同一套提示词（见 `pipeline.py` 中的 `EXTRACT_PROMPT` /
-`SCORE_PROMPT` / `MATCH_PROMPT` / `CARD_PROMPT`）、同一套评分权重
-（`knowledge.yaml` 的 `scoring_weights`）、同一份产品目录，写入同一批字段。
-通道 A 恢复后重跑 `pipeline.py`，结果结构完全一致。
+**结论**：顶配 Claude 想开思考**只能走 anthropic 原生风格**。
+这推翻了 08-23 那版注释里「该中转拿不到扩展思考」的说法——那句话只对 OpenAI 兼容端点成立，
+当时的测法（在 chat/completions 上发 `reasoning_effort`）恰好落在唯一无效的组合上。
+
+### 预算档位
+
+`THINKING_BUDGETS = {off:0, low:2048, medium:8192, high:16384, max:32000}`
+
+budget 是**上限不是目标**：2048→60000 六档全部 HTTP 200，
+但同一道题的实际思考量在 141~455 字之间随机波动，**不随预算单调增长**。
+所以调高档位不会线性烧钱；真正决定成本的是输入长度和任务复杂度。
+
+`max_tokens` 会自动抬到 `budget + 8192`，给正文留够空间。
+如果模型把额度全花在思考上、正文一个字没写，`_ask_api` 会明确报
+「思考档 X 把 max_tokens 吃光」，而不是笼统的「返回空内容」。
+
+---
+
+## 三、冒烟通过的各家顶配（2026-08-29，线路2）
+
+同一道需要几步推理的题，13/15 通过，全部答对：
+
+`claude-opus-5`(2.3s) · `claude-opus-4-8`(6.0s) · `gpt-5.6-terra`(3.1s) ·
+`gpt-5.4-pro`(9.2s) · `o3-pro`(12.1s) · `gemini-3.1-pro-preview-thinking`(5.4s) ·
+`grok-4.6`(7.2s) · `deepseek-v4-pro`(4.3s) · `kimi-k3`(4.5s) ·
+`qwen3.5-plus`(49.0s) · `glm-5.3`(3.1s) · `doubao-seed-2-0-pro-260215`(3.8s)
+
+两个失败的都是 HTTP 503（中转侧 `shell_` 类错误，非 key 问题）：
+`gpt-5.4-xhigh`、`deepseek-v3.2-think`。
+
+账号可见清单比技能文档记录的更新，出现了 `grok-4.6`、`deepseek-v4-pro`、`glm-5.3`、
+`gemini-3.1-pro-preview` 等文档里没有的 ID。**账号可见 ≠ 冒烟通过**，换模型前先测。
+
+---
+
+## 四、另外两条通道
+
+### `claude_cli`
+
+本机已安装并登录，隔离探针已通过（口令未泄漏、shell 未执行）。
+但**开销大**：一次简单探测就超过 120s 超时。当前不作为主通道。
+
+历史结论（2026-08-14）仍然成立：Claude Code 会话内的认证由宿主 app 通过
+`CLAUDE_CODE_MESSAGING_SOCKET` 提供，**不落盘、不随环境变量传给子进程**，
+所以必须在交互式终端跑一次 `claude` 完成浏览器授权，凭据落盘后子进程才能用。
+
+### `codex_cli`
+
+本机未安装，界面如实标注为不可选。参数组合未经实测，
+因此该通道同样必须通过隔离探针才允许启用——不按文档推测它是安全的。
+
+---
+
+## 五、超时
+
+`TIMEOUT = 300`（原 180）。开了思考之后单次调用明显变长：
+短问题就要 10~14s，真实公告抽取实测 10.9s，长正文更久。
+180s 会把本来能成的调用误判成超时。
+
+中转长生成偶发断连（`ReadTimeout` / `SSLError`）。**本模块不做自动重试**，
+失败即抛 `LLMUnavailable` 如实上报，符合「不降级、不兜底」的规矩。
+
+---
+
+## 六、六模型评测（2026-08-29，线路2）
+
+用**真实业务 prompt**（`pipeline.EXTRACT_PROMPT` + `SCORE_PROMPT`，未另写一份）
+在 12 条真实公告上逐模型串行跑了一遍，六个模型吃**逐字相同**的输入。
+思考档统一 max（claude 走 anthropic 原生 `thinking{budget_tokens:32000}`，
+其余走 openai 兼容 `reasoning_effort=high`）。
+
+> ⚠️ **12 条 × 1 次采样，无重复实验。下面所有比率的分母都是个位数到十几，不可外推。**
+> 评测集是 08-28 抓的旧 signal——08-29 当天跑爬虫**新增 0 条**（候选 URL 全部已入库）。
+> 完整报告与 82 次调用的逐条明细不在仓库内（评测产物不进 git）。
+
+### 结论表
+
+| 模型 | 风格 | 成功/传输失败 | 抽取覆盖 | 与 opus5 判定一致 | JSON一次通过 | 延迟中位 | 思考覆盖 | 花费 |
+|---|---|---|---:|---|---|---:|---:|---:|
+| `claude-opus-5`（基线） | anthropic | **15 / 0** | 12/12 | — | 100% | 12.4s | 73.3% | $0.975 |
+| `claude-fable-5` | anthropic | **14 / 0** | 12/12 | 11/12 | 100% | 14.7s | **7.1%** | **$2.322** |
+| `kimi-k3` | openai | 12 / **1** | 12/12 | 10/12 | 100% | **9.4s** | 100% | **$0.263** |
+| `glm-5.3` | openai | 9 / **4** | **8/12** | 8/8 | 100% | 26.7s | 100% | $1.016 |
+| `gpt-5.6-sol` | openai | **14 / 0** | 12/12 | **11/12** | 100% | 10.2s | 100% | $0.494 |
+| `gemini-3.1-pro-preview-thinking` | openai | **13 / 0** | 12/12 | 10/12 | 100% | 21.9s | 100% | $0.326 |
+
+- **六个模型 JSON 一次通过率全部 100%**，`_escape_inner_quotes` 一次都没用上——这项区分不出模型。
+- **`industry` 六家 100% 落在 taxonomy 内**，无人自造类目。
+- 全部传输失败都是中转 300s `ReadTimeout`，不是 key 问题；**无模型触发「连续 3 次」熔断**。
+- 评测总花费 $5.44（含冒烟），线路2 剩余约 $94.3。预算闸门（单模型 $20 / 累计 $60）未触发。
+
+### 主力推荐：维持 `claude-opus-5`
+
+零失败、JSON 全通过、**采购方抽得对**（#459「中国化学签约48.16亿」里它抽的是项目业主
+吉远/卓菲特，而 `claude-fable-5` 与 `gemini` 抽成了总包方中国化学——按知识库
+「产业链穿透」口径，后者抽的是卖方不是买方）。12 条 $0.975，成本可接受。
+
+**备选（若要压成本）**：`gpt-5.6-sol`——零失败、一致率并列最高、采购方抽取与基线一致、
+延迟更低，**成本只有基线的 51%**。本次唯一各项都不输基线的模型。
+
+**不建议**：
+- `claude-fable-5`：2.38 倍成本、思考覆盖仅 7.1%、company/region 填充率各只有 50%。
+- `glm-5.3`：4/13 调用超时（30.8%），每次白烧 5 分钟，**通道稳定性不达标**。
+
+### 两处需要人工裁定的分歧
+
+1. **#452「国富氢能与韩国 Hylium 签绿氢购销意向」**：只有基线判商机（且只给 35 分），
+   其余四家判非商机，理由直接引用知识库排除项第 2、3 条（标的物无关 / 同业竞争对手）。
+   若认定它确属非商机，则基线「商机率 25% 最高」不是优点而是**更宽松的误报倾向**。
+2. **#450「内蒙古公布21个氢能应用场景」**：4 家判商机、`kimi-k3` 与 `gemini` 判非商机。
+   争点是「点了名的场景清单算不算具体采购主体」。四家分数 52~60，离出卡线 80 很远，不影响产出。
+
+### 思考档的两个新格子（实测补充 §二）
+
+- **`claude-fable-5`**：同一条线路、同一段代码、同一个 budget=32000，
+  思考覆盖只有 **7.1%（1/14）**，而 `claude-opus-5` 是 73.3%（11/15）。
+  fable 几乎不产出 thinking 块。
+- **`gpt-5.6-sol`**：在**业务 prompt** 上稳定返回 `reasoning_content`（覆盖 100%）；
+  但在简单算术题上不返回、usage 里也没有 `reasoning_tokens`。
+  §二 记录的「gpt 家族无痕迹」测的是 `terra` / `5.4-pro` / `o3-pro`，
+  **`gpt-5.6-sol` 此前从未测过**——这是补格子，不是推翻旧结论。
+- `claude-opus-5` 冒烟题 thought=0 是**模型对熟题选择不思考**，不是通道没开：
+  换一道题同样配置返回了真实 thinking 块（带 signature）。§二 的结论仍然成立。
