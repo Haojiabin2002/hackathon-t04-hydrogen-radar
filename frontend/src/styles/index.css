@@ -8,9 +8,12 @@
  *   utilities  原子工具类
  *   layout     壳骨架（侧栏 / 顶栏 / 多标签 / 内容区）
  *   components 全站共用组件
+ *   auth       登录 / 口令浮层 / 账户页
  *   motion     关键帧与过渡
  *
  * 页面私有样式不在这里引，跟着页面文件走（见 views/<域>/<页>.css）。
+ * auth 是例外：它同时覆盖组件层（ArtAuthForm / ArtAuthChallenge）和两个页面，
+ * 不属于任何单页，塞进 components.css 又会让那个文件更长，所以单独一层。
  * ========================================================================= */
 
 @import '@fontsource-variable/ibm-plex-sans';
@@ -20,4 +23,5 @@
 @import './utilities.css';
 @import './layout.css';
 @import './components.css';
+@import './auth.css';
 @import './motion.css';

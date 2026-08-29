@@ -1,11 +1,20 @@
 import { lazy } from 'react';
-import { AlarmClock, Brain, Settings2, SlidersHorizontal } from 'lucide-react';
+import { AlarmClock, Brain, Settings2, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import type { RouteGroup } from '../types';
 
 export const systemGroup: RouteGroup = {
   key: 'system',
   label: '系统运行',
   routes: [
+    {
+      path: '/settings/account',
+      component: lazy(() => import('../../views/system/AccountPage')),
+      meta: {
+        title: '账户与访问',
+        icon: ShieldCheck,
+        description: '后端是一把共享口令，不是账号体系。这里如实显示口令是否启用、本标签页是否解锁、以及口令具体保护了哪些写操作。',
+      },
+    },
     {
       path: '/automation',
       component: lazy(() => import('../../views/system/AutomationPage')),

@@ -6,6 +6,7 @@ import './styles/index.css';
 import { router } from './router';
 import { queryClient } from './lib/query';
 import { SettingsProvider } from './hooks/useSettings';
+import { AdminAuthProvider } from './hooks/useAdminAuth';
 
 const root = document.getElementById('root');
 
@@ -16,9 +17,11 @@ if (!root) {
 createRoot(root).render(
   <StrictMode>
     <SettingsProvider>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
+      <AdminAuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      </AdminAuthProvider>
     </SettingsProvider>
   </StrictMode>,
 );

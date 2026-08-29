@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from '../layouts/AppLayout';
 import { flatRoutes } from './modules';
@@ -6,7 +6,14 @@ import { flatRoutes } from './modules';
 /**
  * 路由表由 router/modules/* 生成 —— 不要在这里手写页面清单。
  * 加页面请改对应 module，侧栏菜单和多标签页会自动跟上。
+ *
+ * 唯一例外是下面的 /login：它必须渲染在 AppLayout **之外**（登录页不该套
+ * 侧栏和多标签），而 modules 里的记录全部是 AppLayout 的子路由。
+ * 它也不该进菜单，所以放 modules 里反而要额外加 hideInMenu + hideInWorktab。
+ * 这个例外只此一处，不要拿它当在这里加页面的先例。
  */
+
+const LoginPage = lazy(() => import('../views/auth/LoginPage'));
 
 function RouteFallback() {
   return (
@@ -31,6 +38,15 @@ function RouteError() {
 
 export const router = createBrowserRouter(
   [
+    {
+      path: '/login',
+      element: (
+        <Suspense fallback={<RouteFallback />}>
+          <LoginPage />
+        </Suspense>
+      ),
+      errorElement: <RouteError />,
+    },
     {
       path: '/',
       element: <AppLayout />,
