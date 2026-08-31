@@ -1,0 +1,7 @@
+# 工具启停与确认要求。由看板「工具」页写入，也可以手改。
+# disabled       停用的工具（内置与自定义通用）
+# custom_enabled 自定义工具的启用白名单——不在这里就是停用（新上传默认不生效）
+# confirm        确认要求覆盖；只许收紧（false→true），放松会被接口拒绝
+confirm: {}
+custom_enabled: []
+disabled: []

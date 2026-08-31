@@ -97,7 +97,7 @@ export function ArtSettingsDrawer({ open, onClose }: { open: boolean; onClose: (
                   key={preset.value}
                   type="button"
                   className={`art-swatch ${settings.brandSeed === preset.value ? 'is-active' : ''}`}
-                  style={{ background: preset.value }}
+                  style={{ background: preset.swatch ?? preset.value }}
                   aria-label={preset.label}
                   aria-pressed={settings.brandSeed === preset.value}
                   title={preset.label}
@@ -106,7 +106,8 @@ export function ArtSettingsDrawer({ open, onClose }: { open: boolean; onClose: (
               ))}
             </div>
             <p className="form-hint" style={{ marginTop: 10 }}>
-              交互蓝、选中态、链接与焦点都由这一个种子色派生；状态色（绿/琥珀/红）不受影响。
+              强调色、选中态、链接与焦点都由这一个种子色派生；状态色（绿/琥珀/红）不受影响。
+              「跟随主题」在深色下用观测站薄荷、亮色下用皇家蓝；选了固定色则两套主题共用。
             </p>
           </section>
 

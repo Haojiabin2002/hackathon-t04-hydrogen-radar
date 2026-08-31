@@ -394,3 +394,52 @@
   .trade-queue-list a { grid-template-columns: 28px minmax(0, 1fr) auto; }
   .trade-queue-list a > svg { display: none; }
 }
+
+/* 一页多标的：招投标汇总贴一篇含多个互不相干的采购标的，
+   研判单要能在它们之间切换，否则只能看见第一条、其余静默消失。 */
+.trade-review-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 13px 19px;
+  background: var(--wash);
+  border-bottom: 1px solid var(--line);
+}
+.trade-review-targets > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.trade-review-target-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.trade-review-target {
+  max-width: 100%;
+  min-height: 27px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  overflow: hidden;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+.trade-review-target > em {
+  flex: 0 0 auto;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  opacity: .6;
+}
+.trade-review-target:hover { color: var(--ink); border-color: var(--line-strong); }
+.trade-review-target.trade-target-active {
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-color: var(--brand-line);
+}

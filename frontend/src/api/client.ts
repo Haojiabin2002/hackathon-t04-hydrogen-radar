@@ -1,3 +1,5 @@
+import { readAdminToken, requestAdminToken, writeAdminToken } from './adminToken';
+
 export type MutationMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface FastApiValidationIssue {
@@ -54,9 +56,10 @@ export class ApiError extends Error {
 }
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
-const adminTokenKey = 'hydrogen-radar-admin-token';
 
-function resolveUrl(path: string): string {
+/** 口令读写与 401 补救都在 api/adminToken.ts，这里不再自己碰 sessionStorage。 */
+
+export function resolveUrl(path: string): string {
   if (!path.startsWith('/')) {
     throw new Error(`API 路径必须以 / 开头：${path}`);
   }
@@ -79,12 +82,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const mutation = Boolean(init?.method && !['GET', 'HEAD', 'OPTIONS'].includes(init.method.toUpperCase()));
 
   function savedAdminToken(): string {
-    if (!mutation || typeof window === 'undefined') return '';
-    try {
-      return window.sessionStorage.getItem(adminTokenKey)?.trim() ?? '';
-    } catch {
-      return '';
-    }
+    return mutation ? readAdminToken() : '';
   }
 
   async function perform(adminToken = savedAdminToken()): Promise<Response> {
@@ -106,14 +104,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(0, `无法连接雷达服务：${message}`, error);
   }
 
+  // 401 补救：向界面要一次口令再重发。挂了登录浮层时走浮层，
+  // 没挂时 requestAdminToken 会退回浏览器原生 prompt——行为不退化。
   if (response.status === 401 && mutation && typeof window !== 'undefined') {
-    const token = window.prompt('该操作需要管理员口令。口令只保存在当前浏览器会话中。')?.trim();
+    const token = (await requestAdminToken())?.trim();
     if (token) {
-      try {
-        window.sessionStorage.setItem(adminTokenKey, token);
-      } catch {
-        // 浏览器禁用会话存储时仍可完成当前一次请求。
-      }
+      writeAdminToken(token);
       response = await perform(token);
     }
   }
@@ -133,6 +129,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function apiGet<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'GET' });
+}
+
+/**
+ * 取 text/plain 端点的原文（目前只有 GET /api/knowledge/raw —— knowledge.md 本体）。
+ *
+ * parseBody 对非 JSON 响应已经返回字符串，所以这里只是把类型钉死，
+ * 顺便把「后端返回空文件」和「后端没返回内容」都归成空串，调用方不用判 undefined。
+ */
+export async function apiGetText(path: string): Promise<string> {
+  const body = await request<unknown>(path, { method: 'GET' });
+  return typeof body === 'string' ? body : '';
 }
 
 export function apiMutation<T>(

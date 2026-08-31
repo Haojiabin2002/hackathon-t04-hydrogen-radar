@@ -1,0 +1,257 @@
+/* ============================================================================
+ * 登录与访问控制
+ *
+ * 跨了组件层（ArtAuthForm / ArtAuthChallenge）与两个页面（登录页 / 账户页），
+ * 既不属于某一页的私有样式，也不该塞进已经很长的 components.css，故独立成层。
+ *
+ * 形态取自 Linear 的两条纪律：**发丝线代替阴影**定义边界，重音色当手电筒用，
+ * 一屏只亮一处（这里是主按钮）。色值一律走 tokens.css 的角色层，本文件不出现
+ * 任何硬编码色。
+ * ========================================================================= */
+
+/* ------------------------------------------------------------ 口令输入表单 */
+
+.auth-form { display: grid; gap: var(--space-lg); }
+
+.auth-input {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  min-height: var(--control-h-lg);
+  background: var(--surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.auth-input:focus-within { background: var(--surface); border-color: var(--brand); }
+.auth-input > svg { flex: none; color: var(--faint); }
+.auth-input:focus-within > svg { color: var(--brand); }
+
+.auth-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: .02em;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.auth-input input::placeholder { color: var(--faint); letter-spacing: 0; }
+
+.auth-reveal {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--faint);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+.auth-reveal:hover { color: var(--ink-2); background: var(--surface-hover); }
+.auth-reveal:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+.auth-error { color: var(--danger); font-size: 12.5px; line-height: 1.55; }
+
+.auth-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.auth-actions .btn { min-width: 104px; justify-content: center; }
+.auth-form .spin { animation: spin 900ms linear infinite; }
+
+/* ---------------------------------------------------------- 401 口令浮层 */
+
+.auth-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--space-lg);
+  background: var(--scrim);
+  animation: fade-in var(--dur-fast) var(--ease);
+}
+
+.auth-dialog {
+  width: min(420px, 100%);
+  padding: var(--space-xl);
+  display: grid;
+  gap: var(--space-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-float);
+  box-shadow: var(--shadow-float);
+}
+
+.auth-dialog-head { display: flex; gap: 13px; align-items: flex-start; }
+.auth-dialog-head h2 { margin: 0 0 4px; font-size: 15.5px; font-weight: 600; letter-spacing: -.015em; }
+.auth-dialog-head p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+.auth-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: var(--radius-base);
+}
+.auth-badge.is-ok { color: var(--success); background: var(--success-soft); }
+.auth-badge.is-open { color: var(--info); background: var(--info-soft); }
+
+.auth-foot {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.auth-foot a { margin-left: 8px; color: var(--brand); }
+
+/* -------------------------------------------------------------- 登录页面 */
+
+.auth-page {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-lg);
+  background: var(--app-bg);
+  overflow: hidden;
+}
+
+/* 发丝网格：几何感来自线，不来自阴影或渐变色块 */
+.auth-page-grid {
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 74% 58% at 50% 42%, #000 12%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 74% 58% at 50% 42%, #000 12%, transparent 78%);
+  opacity: .8;
+}
+
+.auth-card {
+  position: relative;
+  width: min(452px, 100%);
+  padding: var(--space-2xl);
+  display: grid;
+  gap: var(--space-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-card);
+}
+
+.auth-brand { display: flex; align-items: center; gap: 11px; }
+.auth-brand strong { display: block; font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+.auth-brand small { display: block; margin-top: 2px; color: var(--faint); font-size: 12px; }
+
+.auth-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--brand-on);
+  background: var(--brand);
+  border-radius: var(--radius-base);
+}
+
+.auth-title { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.025em; }
+.auth-lede { margin: -6px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.7; }
+.auth-lede b { color: var(--ink-2); font-weight: 600; }
+
+.auth-warn {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--risk);
+  font-size: 12.5px;
+  line-height: 1.6;
+  background: var(--risk-soft);
+  border: 1px solid var(--risk-line);
+  border-radius: var(--radius-base);
+}
+
+/* 未启用口令 / 已解锁时的说明块 */
+.auth-open { display: flex; gap: 13px; align-items: flex-start; }
+.auth-open h1 { margin: 0 0 5px; font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
+.auth-open p { margin: 0 0 14px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.auth-open b { color: var(--ink-2); }
+
+.auth-card code,
+.account-notes code,
+.account-state-text code {
+  padding: 1px 5px;
+  color: var(--ink-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .92em;
+  background: var(--surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+/* ---------------------------------------------------------- 账户与访问页 */
+
+.account-state { display: flex; gap: 14px; align-items: flex-start; }
+.account-state-text { flex: 1; min-width: 0; }
+.account-state-text strong { display: block; margin-bottom: 5px; font-size: 14.5px; letter-spacing: -.01em; }
+.account-state-text p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.account-state-text b { color: var(--ink-2); }
+.account-state[data-state='authorized'] .auth-badge { color: var(--success); background: var(--success-soft); }
+.account-state[data-state='open'] .auth-badge { color: var(--info); background: var(--info-soft); }
+.account-state[data-state='unknown'] .auth-badge { color: var(--muted); background: var(--surface-subtle); }
+
+.account-unlock {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--line);
+  max-width: 420px;
+}
+
+.account-guarded { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-xl); }
+.account-guarded h4 {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.account-guarded ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; }
+.account-guarded li {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.account-guarded li:last-child { border-bottom: 0; }
+.account-guarded li code {
+  flex: none;
+  color: var(--faint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+}
+
+.account-notes { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+.account-notes li { color: var(--muted); font-size: 13px; line-height: 1.75; }
+.account-notes b { display: block; color: var(--ink); font-weight: 600; }
+
+.account-links { margin: var(--space-lg) 0 0; color: var(--muted); font-size: 13px; }
+.account-links a { margin-right: 14px; color: var(--brand); }
+
+@media (max-width: 720px) {
+  .auth-card { padding: var(--space-xl); }
+  .account-state { flex-wrap: wrap; }
+  .account-guarded li { flex-direction: column; gap: 3px; }
+}

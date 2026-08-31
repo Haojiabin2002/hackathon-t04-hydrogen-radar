@@ -1,16 +1,29 @@
 import { useMemo } from 'react';
-import { ArrowRight, ExternalLink, SignalZero, X } from 'lucide-react';
+import { ArrowDown, ArrowRight, ArrowUp, SignalZero, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiGet } from '../../api/client';
 import type { Lead } from '../../api/types';
 import { useTable, type TableColumn, type TableFilter } from '../../hooks/useTable';
 import { useRouteMeta } from '../../hooks/useRouteMeta';
 import { ArtPageHead } from '../../components/cards/ArtPageHead';
+import { ArtLeadCard } from '../../components/cards/ArtLeadCard';
 import { ArtFilterChips } from '../../components/forms/ArtFilterChips';
 import { ArtPagination } from '../../components/forms/ArtPagination';
-import { ArtTable } from '../../components/tables/ArtTable';
 import { ArtTableHeader } from '../../components/tables/ArtTableHeader';
 import { ArtEmpty, ArtError, ArtLoading } from '../../components/feedback/ArtStates';
+import './opportunities.css';
+
+/**
+ * 客户信息卡看板 · 卡片网格
+ *
+ * 2026-08-30 由表格改为卡片：呈现形态换了，**能力一条都没换**——
+ * 筛选 chip、关键词搜索、排序、分页全部保留，且仍然走同一个 useTable，
+ * 所以 URL 里的 ?q= / ?filter= 也照旧能还原视图。
+ *
+ * 唯一去掉的是「列设置」：它是表格专有的（隐藏某一列），卡片上没有列可隐藏。
+ * 排序原本挂在表头上，卡片没有表头，因此在工具条上补了一排显式排序按钮——
+ * 不补的话排序就真丢了。
+ */
 
 const FILTERS: Array<TableFilter<Lead>> = [
   { key: 'all', label: '在研', test: (lead) => lead.status !== 'rejected' },
@@ -21,97 +34,50 @@ const FILTERS: Array<TableFilter<Lead>> = [
   { key: 'rej', label: '判非商机', test: (lead) => lead.status === 'rejected' },
 ];
 
-function scoreBadge(lead: Lead) {
-  if (lead.status === 'rejected') return 'badge-neutral';
-  if ((lead.score ?? 0) >= 80) return 'badge-success';
-  if ((lead.score ?? 0) >= 60) return 'badge-warning';
-  return 'badge-neutral';
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return '日期未载';
-  return value.slice(0, 10);
-}
-
-const columns: Array<TableColumn<Lead>> = [
-  {
-    key: 'company',
-    label: '商机主体',
-    fixed: true,
-    width: 280,
-    render: (lead) => (
-      <div className="table-title">
-        <Link to={`/opportunities/${lead.id}`}>{lead.company || '公告未提及采购主体'}</Link>
-        <small>#{lead.id} · {lead.signal_type || lead.signal_title || '未分类信号'}</small>
-      </div>
-    ),
-  },
+/**
+ * 排序维度。useTable 只消费 key / sortValue，卡片网格不走 column.render，
+ * 所以这里的 render 恒为 null——留着是为了满足 TableColumn 契约，不是死代码。
+ */
+const SORTS: Array<TableColumn<Lead>> = [
   {
     key: 'score',
     label: '评分',
-    width: 96,
     sortable: true,
-    sortValue: (lead) => (lead.status === 'rejected' ? -1 : lead.score ?? 0),
-    render: (lead) => (
-      <span className={`badge ${scoreBadge(lead)}`}>
-        {lead.status === 'rejected' ? '非商机' : `${lead.score ?? '—'} 分`}
-      </span>
-    ),
+    sortValue: (lead) => (lead.status === 'rejected' ? -1 : lead.score ?? -1),
+    render: () => null,
   },
   {
-    key: 'region',
+    key: 'deadline',
+    label: '截止时间',
+    sortable: true,
+    // 没有截止时间的排在最后：空串在升序里会跑到最前面，那会把「未载截止」
+    // 当成「最急」，是误导。
+    sortValue: (lead) => lead.deadline || '9999-12-31',
+    render: () => null,
+  },
+  {
+    key: 'published',
+    label: '发布时间',
+    sortable: true,
+    sortValue: (lead) => lead.published_at || '',
+    render: () => null,
+  },
+  {
+    key: 'contacts',
+    label: '关键人数',
+    sortable: true,
+    sortValue: (lead) => lead.contacts_count ?? 0,
+    render: () => null,
+  },
+  {
+    // 换成卡片后一度漏掉这一维：原表格的「行业 / 地区」列是可排序的，
+    // 换呈现形态不该丢功能。行业与地区拼在一起排，等于先按行业聚堆、
+    // 再按地区聚堆——正是销售「今天集中打某个行业/某个省」的用法。
+    key: 'industry',
     label: '行业 / 地区',
     sortable: true,
-    sortValue: (lead) => lead.industry ?? '',
-    render: (lead) => (
-      <>
-        {lead.industry || <span className="cell-muted">未归类</span>}
-        <br />
-        <small className="cell-muted">{lead.region || '公告未提及地区'}</small>
-      </>
-    ),
-  },
-  {
-    key: 'scale',
-    label: '规模 / 截止',
-    render: (lead) => (
-      <>
-        {lead.amount || lead.power_range || <span className="cell-muted">公告未提及</span>}
-        <br />
-        <small className="cell-muted">{lead.deadline ? `截止 ${formatDate(lead.deadline)}` : '截止日期未载'}</small>
-      </>
-    ),
-  },
-  {
-    key: 'product',
-    label: '产品匹配',
-    render: (lead) => (
-      <>
-        {lead.matched_product || <span className="cell-muted">尚未配型</span>}
-        <br />
-        {lead.has_card ? <span className="badge badge-success">有作战卡</span> : null}
-      </>
-    ),
-  },
-  {
-    key: 'evidence',
-    label: '证据',
-    width: 200,
-    render: (lead) => (
-      <div className="row-actions">
-        {lead.overseas && <span className="badge badge-info">海外</span>}
-        {lead.corroboration && <span className="badge badge-success">交叉验证</span>}
-        <a
-          className="btn btn-link"
-          href={lead.source_url}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`回源核对 ${lead.company || lead.signal_title}`}
-        >
-          原文<ExternalLink size={12} />
-        </a>
-      </div>
-    ),
+    sortValue: (lead) => `${lead.industry || '～'}${lead.region || ''}`,
+    render: () => null,
   },
 ];
 
@@ -120,7 +86,7 @@ export default function OpportunitiesPage() {
 
   const searchFields = useMemo(
     () => (lead: Lead) => [
-      lead.company, lead.signal_title, lead.signal_type,
+      lead.company, lead.subject, lead.signal_title, lead.signal_type,
       lead.region, lead.industry, lead.matched_product,
     ],
     [],
@@ -129,10 +95,10 @@ export default function OpportunitiesPage() {
   const table = useTable<Lead>({
     queryKey: ['leads'],
     queryFn: () => apiGet<Lead[]>('/api/leads'),
-    columns,
+    columns: SORTS,
     filters: FILTERS,
     searchFields,
-    pageSize: 20,
+    pageSize: 24,
   });
 
   if (table.loading) return <ArtLoading label="正在加载商机" />;
@@ -162,13 +128,24 @@ export default function OpportunitiesPage() {
 
   const activeFilterLabel = FILTERS.find((item) => item.key === table.activeFilter)?.label ?? '在研';
 
+  /**
+   * 回到默认顺序。useTable 只给了 toggleSort（升 → 降 → 无），没有 setSort，
+   * 所以升序时要点两下才回得到"无"。这里替用户点完，别让人自己数圈数。
+   * 两次调用都走函数式更新，队列里前一次的结果对后一次可见，不会互相吞掉。
+   */
+  const resetSort = () => {
+    if (!table.sort) return;
+    if (!table.sort.desc) table.toggleSort(table.sort.key);
+    table.toggleSort(table.sort.key);
+  };
+
   return (
     <section className="page art-full-height">
       <ArtPageHead
         compact
         title={meta?.title ?? '商机队列'}
         description={meta?.description}
-        actions={<Link className="btn btn-quiet" to="/assistant">询问研判助手<ArrowRight size={15} /></Link>}
+        actions={<Link className="btn btn-quiet" to="/">去对话追问<ArrowRight size={15} /></Link>}
       />
 
       <div className="art-table-card">
@@ -177,8 +154,8 @@ export default function OpportunitiesPage() {
             search={{
               value: table.keyword,
               onChange: table.setKeyword,
-              placeholder: '搜索主体、地区、行业、产品…',
-              label: '搜索商机主体、地区、行业或产品',
+              placeholder: '搜索主体、标的、地区、行业、产品…',
+              label: '搜索商机主体、标的、地区、行业或产品',
             }}
             left={
               <ArtFilterChips
@@ -205,25 +182,58 @@ export default function OpportunitiesPage() {
                     </button>
                   </span>
                 )}
+                <span className="lead-sort" role="group" aria-label="排序">
+                  <span className="lead-sort-label">排序</span>
+                  {SORTS.map((column) => {
+                    const active = table.sort?.key === column.key;
+                    return (
+                      <button
+                        key={column.key}
+                        type="button"
+                        className={`lead-sort-btn${active ? ' is-active' : ''}`}
+                        aria-pressed={active}
+                        onClick={() => table.toggleSort(column.key)}
+                        title={active
+                          ? (table.sort?.desc ? '当前：降序，再点取消排序' : '当前：升序，再点改降序')
+                          : `按${column.label}排序`}
+                      >
+                        {column.label}
+                        {active && (table.sort?.desc
+                          ? <ArrowDown size={11} aria-hidden="true" />
+                          : <ArrowUp size={11} aria-hidden="true" />)}
+                      </button>
+                    );
+                  })}
+                  {table.sort && (
+                    <button
+                      type="button"
+                      className="lead-sort-btn is-reset"
+                      onClick={resetSort}
+                      title="回到默认顺序（后端按评分从高到低返回）"
+                    >
+                      默认顺序
+                    </button>
+                  )}
+                </span>
               </>
             }
             loading={table.isFetching}
             onRefresh={() => void table.refetch()}
-            columns={table.columns}
-            hiddenColumns={table.hiddenColumns}
-            onToggleColumn={table.toggleColumn}
           />
 
-          <ArtTable
-            rows={table.rows}
-            columns={table.visibleColumns}
-            rowKey={(lead) => lead.id}
-            sort={table.sort}
-            onToggleSort={table.toggleSort}
-            emptyContent={table.keyword
-              ? `「${table.keyword}」在${activeFilterLabel}范围内没有命中，真实数据仍然保留。`
-              : '该筛选范围内暂无记录，真实数据仍然保留。'}
-          />
+          <div className="lead-grid-scroll">
+            {table.rows.length === 0 ? (
+              <p className="lead-grid-empty">
+                {table.keyword
+                  ? `「${table.keyword}」在${activeFilterLabel}范围内没有命中，真实数据仍然保留。`
+                  : '该筛选范围内暂无记录，真实数据仍然保留。'}
+              </p>
+            ) : (
+              <div className="lead-grid">
+                {table.rows.map((lead) => <ArtLeadCard key={lead.id} lead={lead} />)}
+              </div>
+            )}
+          </div>
 
           <ArtPagination
             page={table.page}

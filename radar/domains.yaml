@@ -1,0 +1,30 @@
+# 域名分层策略 —— 受控触网层 reach.py 的唯一判据。
+#
+# agent 无权改本文件：拉黑走审批提案（同域两次验证码触发，人批准后写进
+# 本机 overlay），新增常驻源走 propose_source 审批。本文件只存人工定版的基线。
+#
+# 层级语义：
+#   allow    常驻源与已批域名：正常记账放行
+#   deny     人工批准拉黑：一律拒绝
+#   signpost 路标层（付费聚合站）：可抓来发现线索，正文禁止落库（save_evidence 拒收）
+#   其余     gray（陌生域）：每任务限页数，用于搜索结果核实与穿透取证
+
+allow:
+  - h2weilai.com        # 氢启未来（现役源）
+  - in-en.com           # 国际氢能网（现役源）
+  - solarbe.com         # 碳索氢能（现役源）
+  - ted.europa.eu       # 欧盟 TED（现役源）
+
+deny: []
+
+signpost:
+  - jianyu360.cn        # 剑鱼标讯：实测未登录可见标题+部分正文，只当路牌
+  - qianlima.com        # 千里马
+  - bidcenter.com.cn    # 采招网：实测详情页为 JS 壳，纯 GET 拿不到正文
+
+# 运行参数（2026-08-29 负责人定版：吞吐类放宽一档，安全类不动）
+gray_page_budget: 8     # 陌生域每任务页数上限
+task_fetch_budget: 60   # 每任务抓页上限
+task_search_budget: 16  # 每任务搜索上限
+daily_fetch_cap: 500    # 全天全局抓页熔断（唯一全局闸，任务数不限）
+per_domain_interval: 1.2  # 每域最小间隔秒数（安全类，不放宽）

@@ -1,0 +1,19 @@
+/* 知识库文件清单页私有样式 · 只作用于 .kb-file-row 内部，不影响 .skill-row 的既有观感 */
+
+/* 共享的 .row-actions 是 flex 且可收缩：主文件卡片右侧只有一个按钮时，
+   它会被左边那段长说明挤到把「编辑」两个字竖着断行。这里钉死不收缩。 */
+.kb-file-row .row-actions {
+  flex-shrink: 0;
+}
+
+.kb-file-row .row-actions .btn {
+  white-space: nowrap;
+}
+
+/* 体积与修改时间那一行：比正文再弱一档，不跟用途说明抢注意力。 */
+.kb-file-meta {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}

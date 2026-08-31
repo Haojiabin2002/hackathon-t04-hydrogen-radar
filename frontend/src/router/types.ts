@@ -29,9 +29,34 @@ export interface AppRouteRecord {
   meta: RouteMeta;
 }
 
-/** 侧栏分组。分组只影响呈现，不影响路由层级。 */
+/**
+ * 侧栏里的二级折叠菜单（如「能力配置」下面的技能 / 记忆 / 自动任务）。
+ *
+ * 它**只是呈现上的收纳**：子项各自仍是一条独立的一级路由，路径不变、
+ * meta 不变，页面标题也仍由自己的 meta 提供。这样收纳一个页面不需要
+ * 改页面代码，也不会出现「三个页面共用一个标题」。
+ */
+export interface RouteSection {
+  key: string;
+  label: string;
+  icon?: LucideIcon;
+  routes: AppRouteRecord[];
+  /**
+   * 插在分组里哪个一级菜单项之后（填那一项的 path）。
+   * 不填、或指向一个不在菜单里的 path，就排在该分组末尾。
+   */
+  after?: string;
+}
+
+/**
+ * 侧栏分组。分组只影响呈现，不影响路由层级。
+ *
+ * 现在只有两组：控制层（操纵 agent 与它的配置）与展示层（看它产出的东西）。
+ * `routes` 是直接挂在分组下的一级项，`sections` 是二级折叠菜单。
+ */
 export interface RouteGroup {
   key: string;
   label: string;
   routes: AppRouteRecord[];
+  sections?: RouteSection[];
 }

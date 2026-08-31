@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
+  BRAND_SEED_AUTO,
   DEFAULT_SETTINGS,
   SETTINGS_STORAGE_KEY,
   type AppSettings,
@@ -74,7 +75,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     root.dataset.theme = resolvedTheme;
     root.dataset.boxMode = settings.boxMode;
-    root.style.setProperty('--brand-seed', settings.brandSeed);
+    // 「跟随主题」时必须把行内值摘掉：行内样式权重高于任何选择器，
+    // 写了值就等于让深浅两套主题共用一个种子（薄荷压在亮色白底上会读不出来）。
+    if (settings.brandSeed === BRAND_SEED_AUTO) {
+      root.style.removeProperty('--brand-seed');
+    } else {
+      root.style.setProperty('--brand-seed', settings.brandSeed);
+    }
     root.style.setProperty('--radius-knob', `${settings.radiusKnob}px`);
     root.style.setProperty(
       '--container-max',

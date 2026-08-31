@@ -5,6 +5,7 @@ import { ArtHeaderBar } from './header/ArtHeaderBar';
 import { ArtWorkTab } from './worktab/ArtWorkTab';
 import { ArtSettingsDrawer } from './settings/ArtSettingsDrawer';
 import { ArtPageContent } from './content/ArtPageContent';
+import { ArtAuthChallenge } from '../components/auth/ArtAuthChallenge';
 import { useSettings } from '../hooks/useSettings';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { WorktabProvider } from '../hooks/useWorktab';
@@ -72,6 +73,7 @@ export function AppLayout() {
         </div>
 
         <ArtSettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <ArtAuthChallenge />
       </div>
     </WorktabProvider>
   );

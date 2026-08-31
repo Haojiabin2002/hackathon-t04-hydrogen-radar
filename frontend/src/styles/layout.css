@@ -350,3 +350,34 @@ button.sidebar-link {
   /* 抽屉形态下"收起侧栏"不产生任何视觉变化，属于无动作入口，直接隐藏 */
   .sidebar-foot { display: none; }
 }
+
+/* ---------- 侧栏二级折叠菜单（控制层 → 能力配置） ---------- */
+
+.sidebar-section { margin-top: 2px; }
+
+.sidebar-section-toggle {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.sidebar-section-toggle.holds-current { color: var(--ink); font-weight: 600; }
+
+.sidebar-section-caret {
+  margin-left: auto;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.sidebar-section.is-open .sidebar-section-caret { transform: rotate(180deg); }
+
+/* 子项缩进 + 一条竖线，让「收纳在能力配置下面」这件事看得出来 */
+.sidebar-section-body {
+  margin: 2px 0 2px 18px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+.sidebar-section-body .sidebar-link { height: 34px; font-size: 13.5px; }
