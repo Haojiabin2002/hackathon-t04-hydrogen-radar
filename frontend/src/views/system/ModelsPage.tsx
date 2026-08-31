@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Cpu, KeyRound, Play, ScanSearch, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Cpu, KeyRound, Play, ScanSearch, Search, ShieldCheck } from 'lucide-react';
 import {
   apiGet,
   apiMutation,
@@ -9,6 +9,7 @@ import {
   LlmChannelInput,
   LlmChannelKey,
   LlmChannelsResponse,
+  ReachStatus,
 } from '../../api';
 import { ArtPageHead } from '../../components/cards/ArtPageHead';
 import { useRouteMeta } from '../../hooks/useRouteMeta';
@@ -40,7 +41,19 @@ export default function ModelsPage() {
     queryFn: () => apiGet<LlmChannelsResponse>('/api/llm/channels'),
   });
 
+  /**
+   * 博查搜索的余额在受控触网那本账里（GET /api/reach/status），不在 LLM 通道里。
+   * 那个接口任何一块读失败都会把该字段置 null 并在 errors 里写原因——
+   * 所以下面一律判 `typeof x === 'number'`，**不许用 `?? 0` 把读不到画成 0**。
+   */
+  const reachQuery = useQuery({
+    queryKey: ['reach-status'],
+    queryFn: () => apiGet<ReachStatus>('/api/reach/status'),
+    retry: false,
+  });
+
   const apiChannel = channelsQuery.data?.channels.find((channel) => channel.key === 'api');
+  const routes = apiChannel?.routes ?? [];
   useEffect(() => {
     if (apiChannel) {
       setApiDraft((current) => ({
@@ -87,6 +100,94 @@ export default function ModelsPage() {
             <ScanSearch size={14} />{channelsQuery.isFetching ? '正在扫描…' : '重新扫描本机'}
           </button>}
       />
+
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <h2>赞助线路与检索额度</h2>
+            <p>只显示线路状态与掩码尾号。接口从不回传密钥明文，页面上也没有能看到明文的地方。</p>
+          </div>
+          <KeyRound size={16} aria-hidden="true" />
+        </div>
+        <div className="panel-body stack">
+          <div>
+            <span className="section-label">LLM 线路（api 通道）</span>
+            <div className="table-shell">
+              <table className="data-table">
+                <thead>
+                  <tr><th>线路</th><th>额度</th><th>Key</th><th>状态</th><th>备注</th></tr>
+                </thead>
+                <tbody>
+                  {routes.map((route) => (
+                    <tr key={route.id}>
+                      <td>{route.name}</td>
+                      <td>${route.quota_usd}</td>
+                      <td>{route.imported ? <code>{route.key_tail || '（后端未给掩码）'}</code> : <span className="cell-muted">未导入</span>}</td>
+                      <td>
+                        {route.active
+                          ? <span className="badge badge-success">当前生效</span>
+                          : <span className="badge badge-neutral">未启用</span>}
+                      </td>
+                      <td className="cell-muted">{route.note}</td>
+                    </tr>
+                  ))}
+                  {routes.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="cell-muted">
+                        {channelsQuery.isLoading ? '正在读取本机通道配置…' : '本机通道扫描没有返回线路清单（后端未提供）。'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {apiChannel && (
+              <small className="form-hint">
+                模型 {apiChannel.model || '后端未提供'} · 接口风格 {apiChannel.style || '后端未提供'}
+                {apiChannel.thinking ? ` · 思考档 ${apiChannel.thinking}` : ''}
+                {' · '}密钥是否已存：{apiChannel.key_set ? '已存（不回显）' : '未存'}
+              </small>
+            )}
+          </div>
+
+          <div>
+            <span className="section-label"><Search size={12} aria-hidden="true" /> 博查搜索</span>
+            {reachQuery.isLoading && <div className="skeleton skeleton-line" />}
+            {reachQuery.isError && (
+              <p className="notice notice-error" role="alert">
+                读不到检索额度：{errorMessage(reachQuery.error)}
+              </p>
+            )}
+            {reachQuery.isSuccess && (
+              <>
+                <p>
+                  余额{' '}
+                  {typeof reachQuery.data.bocha_remaining === 'number'
+                    ? <b>{reachQuery.data.bocha_remaining}</b>
+                    : <b className="cell-muted">读不到</b>}
+                  {' / '}
+                  {typeof reachQuery.data.bocha_total === 'number' ? reachQuery.data.bocha_total : '读不到'}
+                  {typeof reachQuery.data.bocha_used === 'number' && ` · 已用 ${reachQuery.data.bocha_used}`}
+                </p>
+                <small className="form-hint">
+                  今日抓取{' '}
+                  {typeof reachQuery.data.fetch_today === 'number' ? reachQuery.data.fetch_today : '读不到'}
+                  {' / '}
+                  {typeof reachQuery.data.fetch_daily_cap === 'number' ? reachQuery.data.fetch_daily_cap : '读不到'}
+                  {' 页 · 博查 Key 由后端本地保管，接口不回传，页面也不提供输入框。'}
+                </small>
+                {Object.keys(reachQuery.data.errors ?? {}).length > 0 && (
+                  <div className="notice notice-warning" role="status">
+                    <AlertTriangle size={13} aria-hidden="true" />
+                    {' '}这几项读失败了：
+                    {Object.entries(reachQuery.data.errors).map(([field, why]) => `${field}（${why}）`).join('；')}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </section>
 
       <div className="notice notice-warning">
         <strong>真实测试会消耗模型额度。</strong> CLI 首次测试及隔离探针可能需要 10–30 秒，测试期间按钮会锁定；关闭页面不会中断后端请求。

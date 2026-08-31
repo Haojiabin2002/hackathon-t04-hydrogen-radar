@@ -1,0 +1,88 @@
+[
+  {
+    "signal_id": 21,
+    "source": "privacy-test-fixture",
+    "title": "会议联系人排除测试",
+    "note": "合成脱敏样本：会议联系不能当作采购方关键人",
+    "raw_text": "测试用例：八、会议联系方式 参会/赞助/申请报告联系： 示例经理 电话：202-555-0101",
+    "expect_loose": [],
+    "expect_strict": []
+  },
+  {
+    "signal_id": 428,
+    "source": "privacy-test-fixture",
+    "title": "平台客服排除测试",
+    "note": "合成脱敏样本：平台客服与正文句子不构成采购方关键人",
+    "raw_text": "招标测试公告。联系人：投标人务必填写页面。平台客服 电话：202-555-0102",
+    "expect_loose": [
+      {
+        "label": "联系人",
+        "value": "投标人务必填写页面",
+        "context": "招标测试公告。联系人：投标人务必填写页面。平台客服 电话：202-555-0102",
+        "official": false
+      },
+      {
+        "label": "电话",
+        "value": "202-555-0102",
+        "context": "招标测试公告。联系人：投标人务必填写页面。平台客服 电话：202-555-0102",
+        "official": false
+      }
+    ],
+    "expect_strict": []
+  },
+  {
+    "signal_id": 91,
+    "source": "privacy-test-fixture",
+    "title": "官方采购邮箱测试",
+    "note": "合成脱敏样本：结构化官方字段应保留",
+    "raw_text": "[TED 公告编号] TEST-0001\n[采购方] 示例采购单位\n[官方采购联系邮箱] procurement@example.com",
+    "expect_loose": [
+      {
+        "label": "邮箱",
+        "value": "procurement@example.com",
+        "context": "[TED 公告编号] TEST-0001 [采购方] 示例采购单位 [官方采购联系邮箱] procurement@example.com",
+        "official": true
+      }
+    ],
+    "expect_strict": [
+      {
+        "label": "邮箱",
+        "value": "procurement@example.com",
+        "context": "[TED 公告编号] TEST-0001 [采购方] 示例采购单位 [官方采购联系邮箱] procurement@example.com",
+        "official": true
+      }
+    ]
+  },
+  {
+    "signal_id": 412,
+    "source": "privacy-test-fixture",
+    "title": "采购语境邮箱测试",
+    "note": "合成脱敏样本：采购语境中的示例邮箱应保留",
+    "raw_text": "比选采购测试公告：请将报价方案发送到 buyer@example.com。",
+    "expect_loose": [
+      {
+        "label": "邮箱",
+        "value": "buyer@example.com",
+        "context": "比选采购测试公告：请将报价方案发送到 buyer@example.com。",
+        "official": false
+      }
+    ],
+    "expect_strict": [
+      {
+        "label": "邮箱",
+        "value": "buyer@example.com",
+        "context": "比选采购测试公告：请将报价方案发送到 buyer@example.com。",
+        "official": false
+      }
+    ]
+  },
+  {
+    "signal_id": 243,
+    "source": "privacy-test-fixture",
+    "title": "空联系方式测试",
+    "note": "合成脱敏样本：没有联系方式时返回空列表",
+    "raw_text": "示例行业交流新闻：讨论氢能技术应用，不含采购联系人资料。",
+    "expect_loose": [],
+    "expect_strict": []
+  }
+]

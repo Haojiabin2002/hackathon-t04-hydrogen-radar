@@ -7,12 +7,15 @@
  *
  * 规矩：组件样式只准消费 ②③，禁止直接写死十六进制或直接引用 ①。
  *       新增颜色先在 ① 定色阶，再在 ② 起一个语义名字。
- * 来源：色值取自 DESIGN.md frontmatter，改色请先改 DESIGN.md。
+ *
+ * 设计方向：情报观测站（Intelligence Observatory）——近黑曜石画布、薄荷青绿
+ * 单一强调色、硬边信息平面、胶囊操作控件。深色是产品的默认画布；
+ * 亮色整套保留，只是不再是默认。
  * ========================================================================= */
 
 /* ---------------------------------------------------------------- ① 原子层 */
 :root {
-  /* 皇家蓝 · 交互与当前选择 */
+  /* 皇家蓝 · 亮色主题的交互与当前选择（深色改用薄荷，这套保留给亮色与回退） */
   --h2-blue-50: #f4f7ff;
   --h2-blue-100: #eaf0ff;
   --h2-blue-200: #d3e0ff;
@@ -24,7 +27,7 @@
   --h2-blue-800: #0a2d85;
   --h2-blue-900: #071f5c;
 
-  /* 冷灰 · 画布与文本 */
+  /* 冷灰 · 亮色画布与文本 */
   --h2-gray-0: #ffffff;
   --h2-gray-25: #fcfcfd;
   --h2-gray-50: #f8fafc;
@@ -32,21 +35,25 @@
   --h2-gray-200: #e8eefc;
   --h2-gray-300: #e2e8f0;
   --h2-gray-400: #cbd5e1;
-  --h2-gray-500: #94a3b8;
+  /* 亮色 --faint：原 #94a3b8 在白底只有 2.6:1。--faint 在页面里承载的是事实标签、
+   * 接口路径这类正文级小字，必须按 4.5:1 取值，不能按「装饰性弱字」放宽到 3:1。
+   * 压到 #616a7a 后它离 --muted(#5d6677) 很近——这是亮底的物理约束：
+   * 比这更浅就托不住正文。亮色下 faint 与 muted 的层级改由字号字重表达。 */
+  --h2-gray-500: #616a7a;
   --h2-gray-600: #5d6677;
   --h2-gray-700: #3f4756;
   --h2-gray-800: #14141e;
   --h2-gray-900: #020520;
 
-  /* 淡紫洗色 · 分组带 */
+  /* 淡紫洗色 · 亮色分组带 */
   --h2-wash-100: #f0f4fe;
   --h2-wash-200: #e4ecfd;
 
   /* 验证绿 */
   --h2-green-100: #ebfaee;
   --h2-green-200: #aee4b8;
-  --h2-green-500: #119c2a;
-  --h2-green-600: #0d7d21;
+  --h2-green-500: #127f22;  /* 原 #119c2a 在白底 3.6:1，压到 5.1:1 */
+  --h2-green-600: #0c631a;
 
   /* 风险琥珀 */
   --h2-amber-100: #fff4e7;
@@ -57,33 +64,65 @@
   /* 阻断红 */
   --h2-red-100: #fff0ee;
   --h2-red-200: #f3b5af;
-  --h2-red-500: #c64338;
+  --h2-red-500: #bd3b31;    /* 原 #c64338 压在红底上只有 4.45:1 */
   --h2-red-600: #a4362d;
 
-  /* 焦点亮蓝 */
-  --h2-focus: #0099ff;
+  /* 焦点亮蓝 · 冷蓝焦点环与薄荷强调色天然可区分 */
+  --h2-focus: #0b82d6;
 
-  /* 暗色专用底 · 冷调不纯黑，长时间阅读不刺眼 */
+  /* 旧暗色底 · 冷蓝调，观测站换肤后不再被角色层引用，保留给需要回退的地方 */
   --h2-night-900: #070911;
   --h2-night-800: #0d1120;
   --h2-night-700: #141a2c;
   --h2-night-600: #1c2338;
   --h2-night-500: #273049;
+
+  /* ------------------------------------------------ 情报观测站 · 曜石 obsidian
+   * 画布与容器。950 是主画布，逐档抬升表示层级。 */
+  --h2-obsidian-950: #030403;
+  --h2-obsidian-900: #080b0a;
+  --h2-obsidian-800: #101514;
+  --h2-obsidian-700: #171e1c;
+  --h2-obsidian-600: #202927;
+
+  /* 情报观测站 · 薄荷 mint · 唯一品牌强调色 */
+  --h2-mint-300: #b7ffd8;
+  --h2-mint-500: #73ffb9;
+  --h2-mint-600: #44d995;
+  --h2-mint-700: #1fa971;
+
+  /* 情报观测站 · 霜白 frost · 文本 */
+  --h2-frost-0: #f6faf7;
+  --h2-frost-200: #d6ded9;
+
+  /* 情报观测站 · 深色语义状态色
+   * 交叉验证绿刻意压低亮度与饱和，跟近乎荧光的薄荷强调色拉开距离：
+   * 薄荷是"可点/当前选择"，语义绿是"已被交叉验证"，两者不许混淆。 */
+  --h2-verify-500: #35c46b;
+  --h2-alert-500: #f6b445;
+  --h2-block-500: #ff8877;
 }
 
 /* ---------------------------------------------------------------- ③ 旋钮层 */
 :root {
   /* 圆角单旋钮：改这一个值，全站层级圆角同步缩放。
-   * 阶梯名与 DESIGN.md 的 rounded 块一一对应，改名必须两处同改。 */
-  --radius-knob: 14px;
-  --radius-xs: calc(var(--radius-knob) / 2);          /*  7px 小徽章、标签页 */
-  --radius-inner: calc(var(--radius-knob) - 4px);     /* 10px 事实块、列表行 */
-  --radius-control: calc(var(--radius-knob) - 2px);   /* 12px 输入、图标按钮 */
-  --radius-base: var(--radius-knob);                  /* 14px 卡片、证据卡 */
-  --radius-panel: calc(var(--radius-knob) + 2px);     /* 16px 面板 */
-  --radius-float: calc(var(--radius-knob) + 4px);     /* 18px 浮层、抽屉 */
-  --radius-band: calc(var(--radius-knob) + 8px);      /* 22px 追溯链带 */
-  --radius-canvas: calc(var(--radius-knob) + 10px);   /* 24px 页头、工作台 */
+   * 观测站是硬边信息平面，因此旋钮归零。
+   *
+   * 阶梯全部改成「乘旋钮」，不再是「旋钮加减固定像素」：
+   *   ① 旋钮归零时整条阶梯真的归零，不会剩下 panel=2px、canvas=10px 这种半圆角；
+   *   ② 也不会在小旋钮下算出负值——border-radius 收到负值整条声明会失效。
+   * 系数按原来 14px 档的比例定，旋钮拨回 14px 时阶梯与旧版几乎一致
+   * （7 / 10 / 12 / 14 / 16 / 18 / 22 / 24）。
+   * 胶囊 --radius-pill 是独立单列，不跟旋钮走。 */
+  --radius-knob: 0px;
+  --radius-xs: calc(var(--radius-knob) * .5);      /* 小徽章、标签页 */
+  --radius-inner: calc(var(--radius-knob) * .71);  /* 事实块、列表行 */
+  --radius-control: calc(var(--radius-knob) * .86); /* 输入、图标按钮 */
+  --radius-base: var(--radius-knob);               /* 卡片、证据卡 */
+  --radius-panel: calc(var(--radius-knob) * 1.14); /* 面板 */
+  --radius-float: calc(var(--radius-knob) * 1.29); /* 浮层、抽屉 */
+  --radius-band: calc(var(--radius-knob) * 1.57);  /* 追溯链带 */
+  --radius-canvas: calc(var(--radius-knob) * 1.71); /* 页头、工作台 */
   --radius-pill: 999px;
 
   /* 控件基准高度：输入框、按钮、下拉统一 */
@@ -101,7 +140,7 @@
   /* 内容区剩余高度：列表页 .art-full-height 用它撑满不塌陷 */
   --art-full-height: calc(100dvh - var(--header-h) - var(--worktab-h) - var(--content-gutter) * 2);
 
-  /* 间距 · 取自 DESIGN.md spacing */
+  /* 间距 */
   --space-xs: 6px;
   --space-sm: 8px;
   --space-md: 12px;
@@ -119,8 +158,83 @@
   --dur-base: 180ms;
 }
 
-/* ------------------------------------------------------- ② 角色层 · 亮色 */
+/* ------------------------------------------- ② 角色层 · 深色（产品默认画布）
+ * 没有 data-theme 时也走这一套：观测站是产品默认外观，亮色是可选项。 */
 :root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* 画布与容器 · 曜石逐档抬升 */
+  --app-bg: var(--h2-obsidian-950);
+  --surface: var(--h2-obsidian-900);
+  --surface-subtle: var(--h2-obsidian-800);
+  --surface-pressed: var(--h2-obsidian-700);
+  --surface-hover: color-mix(in srgb, var(--h2-mint-500) 7%, var(--h2-obsidian-800));
+  --wash: var(--h2-obsidian-800);
+  --wash-strong: var(--h2-obsidian-700);
+
+  /* 文本 */
+  --ink: var(--h2-frost-0);
+  --ink-2: var(--h2-frost-200);
+  --muted: color-mix(in srgb, var(--h2-frost-200) 74%, transparent);
+  --faint: color-mix(in srgb, var(--h2-frost-200) 56%, transparent);
+
+  /* 分隔 · 半透明霜白，不用实色，才能跟着底面明度自然浮沉 */
+  --line: color-mix(in srgb, var(--h2-frost-0) 15%, transparent);
+  --line-strong: color-mix(in srgb, var(--h2-frost-0) 35%, transparent);
+  --card-border: var(--line);
+
+  /* 品牌 · 薄荷种子，全链自动派生。
+   * --brand-seed 会被设置抽屉的品牌色选择器以行内样式覆盖；
+   * 选「跟随主题」时不写行内值，就落回这里的薄荷。 */
+  --brand-seed: var(--h2-mint-500);
+  --brand: color-mix(in srgb, var(--brand-seed) 82%, var(--h2-frost-0));
+  /* 深色里「更强」= 更亮：--brand-strong 只当文字色用，往霜白方向再提一档 */
+  --brand-strong: color-mix(in srgb, var(--brand-seed) 58%, var(--h2-frost-0));
+  --brand-soft: color-mix(in srgb, var(--brand-seed) 13%, transparent);
+  --brand-faint: color-mix(in srgb, var(--brand-seed) 7%, transparent);
+  --brand-line: color-mix(in srgb, var(--brand-seed) 55%, transparent);
+  /* 薄荷底上必须压近黑，白字在薄荷上读不出来 */
+  --brand-on: var(--h2-obsidian-950);
+
+  /* 状态 */
+  --success: var(--h2-verify-500);
+  --success-soft: color-mix(in srgb, var(--h2-verify-500) 16%, transparent);
+  --success-line: color-mix(in srgb, var(--h2-verify-500) 38%, transparent);
+  --risk: var(--h2-alert-500);
+  --risk-soft: color-mix(in srgb, var(--h2-alert-500) 16%, transparent);
+  --risk-line: color-mix(in srgb, var(--h2-alert-500) 38%, transparent);
+  --danger: var(--h2-block-500);
+  --danger-soft: color-mix(in srgb, var(--h2-block-500) 16%, transparent);
+  --danger-line: color-mix(in srgb, var(--h2-block-500) 38%, transparent);
+  --info: var(--brand);
+  --info-soft: var(--brand-soft);
+
+  --focus: #4db8ff;
+
+  /* 层级 · 深色里投影看不见，只会把边缘糊掉。
+   * 这里用 1px 硬边环代替投影：数值上是 box-shadow，视觉上就是描边。
+   * 注意不能写成 none——`box-shadow: <shadow>, none` 是非法值，
+   * today.css 里就有把 inset 环和品牌投影并排写的地方，整条会失效。 */
+  --shadow-card: 0 0 0 1px var(--card-border);
+  --shadow-float: 0 0 0 1px var(--line-strong);
+  --shadow-inset-selected: inset 0 0 0 1px color-mix(in srgb, var(--brand-seed) 55%, transparent);
+
+  /* 悬停与主动作在深色下不发光，只留位移反馈 */
+  --shadow-brand-sm: 0 0 0 0 transparent;
+  --shadow-brand-md: 0 0 0 0 transparent;
+  --shadow-brand-lg: 0 0 0 0 transparent;
+
+  /* 遮罩：抽屉与移动端导航共用 */
+  --scrim: rgba(3, 4, 3, .72);
+
+  /* 骨架屏 */
+  --skeleton: linear-gradient(90deg, var(--h2-obsidian-800) 25%, var(--h2-obsidian-700) 37%, var(--h2-obsidian-800) 63%);
+}
+
+/* ------------------------------------------------------- ② 角色层 · 亮色
+ * 观测站换肤不动这一套：用户在设置抽屉切到亮色仍是原来的冷白产品画布。
+ * 必须排在深色块之后——两者选择器权重相同，靠书写顺序决定谁赢。 */
 [data-theme='light'] {
   color-scheme: light;
 
@@ -173,7 +287,7 @@
   --shadow-float: 0 2px 8px rgba(2, 5, 32, .06), 0 24px 64px color-mix(in srgb, var(--brand-seed) 9%, transparent);
   --shadow-inset-selected: inset 0 0 0 1px color-mix(in srgb, var(--brand-seed) 28%, transparent);
 
-  /* 悬停与主动作的品牌向投影。暗底上换成纯黑向，否则会变成一圈蓝光。 */
+  /* 悬停与主动作的品牌向投影 */
   --shadow-brand-sm: 0 6px 18px color-mix(in srgb, var(--brand-seed) 8%, transparent);
   --shadow-brand-md: 0 7px 18px color-mix(in srgb, var(--brand-seed) 10%, transparent);
   --shadow-brand-lg: 0 9px 24px color-mix(in srgb, var(--brand-seed) 22%, transparent);
@@ -185,64 +299,7 @@
   --skeleton: linear-gradient(90deg, var(--h2-gray-100) 25%, var(--h2-gray-50) 37%, var(--h2-gray-100) 63%);
 }
 
-/* ------------------------------------------------------- ② 角色层 · 暗色 */
-[data-theme='dark'] {
-  color-scheme: dark;
-
-  --app-bg: var(--h2-night-900);
-  --surface: var(--h2-night-800);
-  --surface-subtle: var(--h2-night-700);
-  --surface-pressed: var(--h2-night-600);
-  --surface-hover: var(--h2-night-700);
-  --wash: var(--h2-night-700);
-  --wash-strong: var(--h2-night-600);
-
-  --ink: #eef2fb;
-  --ink-2: #dbe2f0;
-  --muted: #97a3bb;
-  --faint: #6f7c96;
-
-  --line: rgba(255, 255, 255, .10);
-  --line-strong: rgba(255, 255, 255, .18);
-  --card-border: rgba(255, 255, 255, .09);
-
-  /* 暗底上把种子色整体提亮，保证正文与描边对比度 */
-  --brand: color-mix(in srgb, var(--brand-seed) 68%, #ffffff);
-  --brand-strong: color-mix(in srgb, var(--brand-seed) 48%, #ffffff);
-  --brand-soft: color-mix(in srgb, var(--brand-seed) 22%, transparent);
-  --brand-faint: color-mix(in srgb, var(--brand-seed) 11%, transparent);
-  --brand-line: color-mix(in srgb, var(--brand-seed) 42%, transparent);
-  --brand-on: #04102e;
-
-  /* 暗底上提亮状态色，保证 4.5:1 以上对比 */
-  --success: #45d16a;
-  --success-soft: rgba(69, 209, 106, .15);
-  --success-line: rgba(69, 209, 106, .34);
-  --risk: #f0a53c;
-  --risk-soft: rgba(240, 165, 60, .15);
-  --risk-line: rgba(240, 165, 60, .34);
-  --danger: #ff7a6b;
-  --danger-soft: rgba(255, 122, 107, .15);
-  --danger-line: rgba(255, 122, 107, .34);
-  --info: var(--brand);
-  --info-soft: var(--brand-soft);
-
-  --focus: #4db8ff;
-
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .32);
-  --shadow-float: 0 2px 10px rgba(0, 0, 0, .55), 0 24px 64px rgba(0, 0, 0, .45);
-  --shadow-inset-selected: inset 0 0 0 1px color-mix(in srgb, var(--brand-seed) 55%, transparent);
-
-  --shadow-brand-sm: 0 6px 18px rgba(0, 0, 0, .38);
-  --shadow-brand-md: 0 7px 18px rgba(0, 0, 0, .44);
-  --shadow-brand-lg: 0 9px 24px rgba(0, 0, 0, .55);
-
-  --scrim: rgba(0, 0, 0, .62);
-
-  --skeleton: linear-gradient(90deg, var(--h2-night-700) 25%, var(--h2-night-600) 37%, var(--h2-night-700) 63%);
-}
-
 /* 跟随系统由 index.html 的首绘前脚本解析：它把 'system' 解析成
  * data-theme="light" | "dark" 再落到 <html> 上。因此这里不再复制一份
- * @media (prefers-color-scheme) 角色块——同一套角色变量只准写两遍（亮/暗），
+ * @media (prefers-color-scheme) 角色块——同一套角色变量只准写两遍（暗/亮），
  * 写第三遍就必然会漏改。 */

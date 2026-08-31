@@ -38,3 +38,14 @@ frontend/dist/
 .env.local
 CLAUDE.local.md
 .claude/settings.local.json
+
+# 管线互斥锁：运行时产物，内容是持锁进程的 pid
+.pipeline.lock
+radar/.pipeline.lock
+
+# 知识文档原子写入的中间文件：os.replace 失败时可能残留，不进 git
+*.md.tmp
+
+# 自定义工具与配置的原子写中间文件（os.replace 失败时才会残留）
+*.py.tmp
+*.yaml.tmp

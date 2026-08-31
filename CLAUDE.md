@@ -23,16 +23,15 @@
 ```
 hackathon-t04/
 ├── CLAUDE.md                          本文件 · 全项目唯一约定来源
-├── DESIGN.md                          ⛔ 设计系统唯一来源 · 令牌 / 骨架 / 组件约定
-├── PRODUCT.md                         产品定位说明
-├── README.md                          给人看的项目说明
+├── README.md                          给人看的项目说明（含产品定位）
 ├── .gitignore                         哪些文件不进 git
-├── Dockerfile / railway.json / deploy/  公网部署配置
 │
-├── radar_accept.sh                    ⛔ 验收脚本 · 任何人任何情况不得修改
-├── prototype-v0.1.html                早期静态原型 · 只读参考，不再维护
-├── 氢璞商机判断.txt                     业务需求原文 · knowledge.md 的来源
-├── T04_氢能产业商机与精准获客Agent/      主办方给的企业资料包（6 个 PDF/DOC）· 只读
+├── radar_accept.sh                    ⛔ 验收脚本 · 任何人任何情况不得修改 · 位置不可移动
+├── 资料/                              只读材料区 · 代码不依赖这里的任何文件
+│   ├── 氢璞商机判断.txt                业务需求原文 · knowledge.md 的来源
+│   ├── T04_氢能产业商机与精准获客Agent/  主办方给的企业资料包（6 个 PDF/DOC）
+│   ├── 其他赛道摘录/                   其余赛道的企业痛点说明 · 跨赛道情报（见其 README）
+│   └── VIDEO-SCRIPT.md                演示视频口播稿
 │
 └── radar/                             主程序
     ├── requirements.txt               依赖清单（锁定版本）
@@ -68,7 +67,7 @@ hackathon-t04/
 frontend/src/
 ├── main.tsx                           入口：SettingsProvider → QueryClient → Router
 ├── styles/                            样式分层，加载顺序即层级，见 index.css 头注释
-│   ├── tokens.css                     ⛔ 三层令牌 · 唯一允许出现色值的地方
+│   ├── tokens.css                     样式令牌
 │   ├── reset.css / utilities.css      归零 / 原子工具类
 │   ├── layout.css                     壳骨架：侧栏 + 顶栏 + 多标签 + 内容区
 │   ├── components.css                 全站共用组件
@@ -76,7 +75,7 @@ frontend/src/
 ├── config/setting.ts                  外观默认值与可选项的唯一来源
 ├── router/
 │   ├── types.ts                       AppRouteRecord / RouteMeta
-│   ├── modules/{work,intelligence,system}.ts   ⛔ 菜单唯一真源
+│   ├── modules/{control,display}.ts   菜单来源（控制层/展示层，2026-08-30 重构）
 │   └── index.tsx                      由 modules 生成路由表，不手写页面清单
 ├── layouts/                           AppLayout + sidebar / header / worktab / settings / content
 ├── components/{base,cards,forms,tables,feedback,layouts}/   Art* 组件层
@@ -169,7 +168,7 @@ frontend/src/
 | | 数据侧 | 呈现侧 |
 |---|---|---|
 | 负责人 | @Haojiabin2002 | @MristYun |
-| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.md`<br>`skills.py`<br>`skills/*.md`<br>`llm.py`<br>`agent.py`<br>`tools.py`<br>`harness.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html`<br>`frontend/**`<br>`DESIGN.md` |
+| 可以改 | `crawler.py`<br>`pipeline.py`<br>`knowledge.md`<br>`skills.py`<br>`skills/*.md`<br>`llm.py`<br>`agent.py`<br>`tools.py`<br>`harness.py` | `api.py`<br>`backfill_published.py`<br>`web/index.html`<br>`frontend/**` |
 | 只读不改 | `db.py`、呈现侧的所有文件 | `db.py`、数据侧的所有文件 |
 | 交界面 | 往 `leads` 表**写** | 从 `leads` 表**读** |
 
@@ -181,10 +180,10 @@ frontend/src/
 **给 AI 助手的指令**：如果你发现需要修改不属于当前分支的文件，**停下来告诉用户**，
 不要自己动手。跨界修改是本项目 merge 冲突的唯一来源。
 
-**改前端前必读 `DESIGN.md`**。那份文件是设计系统的唯一来源，里面几条是硬约束：
-组件样式不许写十六进制色值和 `border-radius: Npx`（只准用 `tokens.css` 的角色层与旋钮层）；
-菜单只有 `router/modules/*` 一个来源，不许在组件里手写第二份导航数组；
-亮暗角色变量只准写两遍。这些不是风格偏好，是防止下一个人改一处漏一处。
+> 2026-08-29 精简：`DESIGN.md` 及其前端硬约束已废止（用户拍板），
+> `PRODUCT.md` 并入 `README.md`。
+> 2026-08-31 最终发布包恢复 `Dockerfile`、`railway.json` 与 `deploy/`，
+> 仅用于 Railway 构建、健康检查和持久卷启动，不改变业务数据契约。
 
 ---
 
@@ -193,8 +192,8 @@ frontend/src/
 ```
 radar/.venv/                    虚拟环境，372MB
 radar/radar.db                  SQLite 二进制，git 无法合并，两人各跑一遍必冲突
-radar/radar.db.bak-before-fix   一次性备份
 radar/__pycache__/              编译缓存
+frontend/node_modules/          前端依赖
 ```
 
 `.gitignore` 已经挡住了这些。**不要用 `git add -A` 之后就不检查**，
@@ -212,7 +211,7 @@ radar/__pycache__/              编译缓存
 升版本只改那一行，OpenAPI 文档、`/api/stats` 接口、看板右上角角标三处会一起变。
 `web/index.html` 里那个硬编码的 `v0.0.1` 只是接口没通时的兜底，**不要把它当第二个版本号来维护**。
 
-当前版本：`1.0.0`
+当前版本：`1.2.0`
 
 ---
 

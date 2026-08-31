@@ -45,23 +45,31 @@ export function ArtHeaderBar({
         <div className="header-bar-spacer" />
 
         <div className="header-actions">
-          <button
-            type="button"
-            className="header-status"
-            aria-controls={runPanelId}
-            aria-expanded={runOpen}
-            aria-label={`${headline}，打开采集链路详情`}
-            onClick={() => setRunOpen((value) => !value)}
-          >
-            <span className={`header-status-icon ${isRunning ? 'is-running' : ''} ${chainFailed ? 'is-error' : ''}`}>
-              <Activity size={13} aria-hidden="true" />
-            </span>
-            <span className="header-status-copy" aria-live="polite">
-              <b>{headline}</b>
-              <small>{detail}</small>
-            </span>
-            <ChevronDown size={13} aria-hidden="true" />
-          </button>
+          {/* 采集状态块只在**真有事**的时候出现（2026-08-30 负责人圈掉常驻形态）。
+              闲着时它显示的是「463 条信号 · 上次 暂无记录」——一个不变的总数
+              加一句「暂无」，每页都占着顶栏最显眼的位置却什么也没告诉人。
+              但采集在跑时它是唯一的进度出口（一轮真实爬取要几分钟），
+              失败时也得有地方看原因，所以保留这两种状态下的显示。
+              信号总数在「信号证据」页有正经的位置。 */}
+          {(isRunning || chainFailed) && (
+            <button
+              type="button"
+              className="header-status"
+              aria-controls={runPanelId}
+              aria-expanded={runOpen}
+              aria-label={`${headline}，打开采集链路详情`}
+              onClick={() => setRunOpen((value) => !value)}
+            >
+              <span className={`header-status-icon ${isRunning ? 'is-running' : ''} ${chainFailed ? 'is-error' : ''}`}>
+                <Activity size={13} aria-hidden="true" />
+              </span>
+              <span className="header-status-copy" aria-live="polite">
+                <b>{headline}</b>
+                <small>{detail}</small>
+              </span>
+              <ChevronDown size={13} aria-hidden="true" />
+            </button>
+          )}
 
           <button
             type="button"

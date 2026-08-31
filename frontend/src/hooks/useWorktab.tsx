@@ -29,7 +29,12 @@ interface WorktabContextValue {
 
 const WorktabContext = createContext<WorktabContextValue | null>(null);
 const STORAGE_KEY = 'hydrogen-radar-worktabs';
-const HOME: WorkTabItem = { path: '/', title: '当日研判', fixed: true };
+/** 首页标题跟着路由表走，别在这里写死——首页换过一次（当日研判 → 对话）。 */
+const HOME: WorkTabItem = {
+  path: '/',
+  title: matchRoute('/')?.meta.title ?? '对话',
+  fixed: true,
+};
 
 /**
  * 动态路由带上参数值，避免两条商机详情挤成同一个标签看不出区别。
@@ -46,7 +51,10 @@ function resolveTitle(pathname: string): string | null {
   const actual = pathname.split('/');
   const values = pattern
     .map((segment, index) => (segment.startsWith(':') ? actual[index] : null))
-    .filter((value): value is string => Boolean(value));
+    .filter((value): value is string => Boolean(value))
+    // 参数值是从 pathname 里切出来的，仍是编码态。知识文档名可以是中文，
+    // 不解码标签会显示成「#%E5%90%88…」。解不开就照原样显示，不让标签栏崩掉。
+    .map((value) => { try { return decodeURIComponent(value); } catch { return value; } });
 
   return values.length ? `${route.meta.title} #${values.join('/')}` : route.meta.title;
 }
@@ -58,7 +66,9 @@ function readStored(): WorkTabItem[] {
     if (!raw) return [HOME];
     const parsed = JSON.parse(raw) as WorkTabItem[];
     if (!Array.isArray(parsed) || !parsed.length) return [HOME];
-    return parsed.some((tab) => tab.path === '/') ? parsed : [HOME, ...parsed];
+    // 会话里存的可能是改版前的旧标题，首页那一格一律以当前路由表为准
+    const normalized = parsed.map((tab) => (tab.path === '/' ? HOME : tab));
+    return normalized.some((tab) => tab.path === '/') ? normalized : [HOME, ...normalized];
   } catch {
     return [HOME];
   }

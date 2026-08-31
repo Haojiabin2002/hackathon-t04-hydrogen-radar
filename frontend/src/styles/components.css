@@ -984,8 +984,30 @@
 .switch.is-on { background: var(--brand); border-color: var(--brand); }
 .switch.is-on::after { transform: translateX(18px); border-color: var(--brand-on); }
 
-.chat-layout { min-height: calc(100vh - 185px); display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; }
-.chat-panel { display: flex; flex-direction: column; min-height: 590px; }
+/* 对话页 —— 单列居中。
+ *
+ * 2026-08-30 拍板精简：右侧「Agent 的上下文 + 可用工具」侧栏整条拿掉。
+ * 它不只是噪音，还是个布局炸弹——30 个工具的目录有 4700px 高，把整页撑成
+ * 5000px 长条，于是首页 hero 在 1280×720 只露出 12%，大标题被拦腰切断。
+ * 侧栏一去，对话面板不再需要 sticky + 固定视口高来自保，改回自然流式高度：
+ * hero 想多高就多高，输入框跟在内容后面，页面整体只滚一次。
+ */
+.chat-page { display: flex; justify-content: center; }
+/* 输入框沉到底：内容从上往下流，composer 用 margin-top:auto 吃掉中间的空白，
+ * 于是空态时它落在视口底部（豆包那种形态），有对话时它跟在消息后面。
+ * 不用 position:fixed —— 固定定位会脱离文档流，长对话滚动时盖住最后一条消息。 */
+.chat-column {
+  width: 100%; max-width: 880px;
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: calc(100vh - 175px);
+}
+.chat-column > form.composer { margin-top: auto; }
+.chat-focus-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 9px 14px; font-size: 13px; color: var(--muted);
+  background: var(--surface-subtle); border: 1px solid var(--line); border-radius: var(--radius-inner);
+}
+.chat-focus-bar b { color: var(--ink); }
 .message-list { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 20px; overflow: auto; }
 .message { max-width: 78%; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-base); font-size: 14px; line-height: 1.72; white-space: pre-wrap; animation: message-in 150ms var(--ease) both; }
 .message-user { align-self: flex-end; color: var(--brand-on); background: var(--brand); border-color: var(--brand); border-bottom-right-radius: var(--radius-xs); }
@@ -993,6 +1015,25 @@
 .composer { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 14px; border-top: 1px solid var(--line); }
 .composer input { height: 44px; padding: 0 13px; }
 .quick-list { display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* ------------------------------------------------------- Agent 对话流
+ * 首页只有这一个对话框。一轮 = 一个 .agent-turn：右侧用户气泡 + 左侧回复块。
+ * 回复块里可能有轨迹、调查账、结论气泡、审批卡，所以它是拉满宽度的容器，
+ * 只有结论本身收成气泡——不然一份 40 步的轨迹塞进 78% 宽的气泡没法读。 */
+.agent-thread { scroll-behavior: smooth; }
+.agent-turn { display: flex; flex-direction: column; gap: 10px; }
+.agent-turn + .agent-turn { margin-top: 8px; padding-top: 18px; border-top: 1px dashed var(--line); }
+.agent-turn > .message-user { max-width: 78%; }
+.agent-turn-reply { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.agent-turn-reply > * { max-width: 100%; }
+.agent-turn-reply > .art-trace,
+.agent-turn-reply > .investigation-card,
+.agent-turn-reply > .proposal-stream,
+.agent-turn-reply > .notice { align-self: stretch; margin: 0; }
+.agent-turn-reply > .message-assistant { max-width: 92%; }
+/* 长内容（模型贴的网址、表格样的行）不许把整页撑出横向滚动 */
+.agent-turn-reply .message-assistant { overflow-wrap: anywhere; }
+.composer-hint { grid-column: 1 / -1; margin-top: 2px; }
 
 .markdown-editor { min-height: 54vh !important; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; }
 .markdown-view { padding: 24px; line-height: 1.8; font-size: 13px; }
@@ -1002,6 +1043,29 @@
 .markdown-view table { width: 100%; border-collapse: collapse; }
 .markdown-view th,
 .markdown-view td { padding: 9px; border: 1px solid var(--line); text-align: left; }
+
+/* ArtMarkdown 渲染出来的块（知识库「阅读原文」用）。
+   OpportunityDetailPage 那个 <pre class="markdown-view"> 不受影响：下面全是子元素选择器。 */
+.markdown-view > h2 { margin: 22px 0 8px; font-size: 17px; }
+.markdown-view > h3 { margin: 18px 0 6px; font-size: 15px; }
+.markdown-view > h4,
+.markdown-view > h5,
+.markdown-view > h6 { margin: 14px 0 6px; font-size: 13px; }
+.markdown-view > *:first-child { margin-top: 0; }
+.markdown-view > p { margin: 0 0 10px; }
+.markdown-view > ul,
+.markdown-view > ol { margin: 0 0 12px; padding-left: 22px; }
+.markdown-view > ul li,
+.markdown-view > ol li { margin-bottom: 3px; }
+.markdown-view > blockquote { margin: 0 0 12px; padding: 8px 12px; color: var(--muted); border-left: 3px solid var(--line); background: var(--surface-subtle); }
+.markdown-view > hr { margin: 18px 0; border: 0; border-top: 1px solid var(--line); }
+.markdown-view > pre,
+.markdown-view .md-frontmatter pre { margin: 0 0 12px; padding: 12px; overflow-x: auto; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; line-height: 1.6; background: var(--surface-subtle); border: 1px solid var(--line); border-radius: var(--radius-xs); }
+.markdown-view code { padding: 1px 5px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; background: var(--surface-subtle); border-radius: var(--radius-xs); }
+.markdown-view > pre code,
+.markdown-view .md-frontmatter code { padding: 0; background: none; }
+.markdown-view .md-frontmatter { margin: 0 0 16px; }
+.markdown-view .table-shell { margin: 0 0 14px; }
 .route-error { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: 13px; text-align: center; background: linear-gradient(135deg, var(--surface), var(--wash)); }
 .route-error-code { color: var(--brand); font-size: 72px; font-weight: 760; letter-spacing: -.04em; }
 .route-error h1 { margin: 0; }
@@ -1047,8 +1111,7 @@
 
 /* ----------------------------------------------- 共用响应式（非 Today 页） */
 @media (max-width: 1040px) {
-  .dashboard-grid,
-  .chat-layout { grid-template-columns: 1fr; }
+  .dashboard-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 860px) {
@@ -1099,7 +1162,6 @@
   .art-tool-btn,
   .art-page-btn,
   /* 新增：Agent 与偏好里的小控件 */
-  .assistant-mode button,
   .art-trace-collapse,
   .art-trace-toggle,
   /* 既存漏网的两个，一并补上，免得又是"改一处漏一处" */
@@ -1335,37 +1397,6 @@
 
 .art-trace-spin { animation: spin 1s linear infinite; }
 
-/* ---------------------------------------------------------- 助手模式切换 */
-.assistant-mode {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  background: var(--surface-subtle);
-  border-radius: var(--radius-pill);
-}
-
-.assistant-mode button {
-  display: inline-flex;
-  gap: 5px;
-  align-items: center;
-  min-height: 30px;
-  padding: 0 12px;
-  color: var(--muted);
-  font-size: 12.5px;
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-  transition: all var(--dur-fast) var(--ease);
-}
-
-.assistant-mode button.is-active {
-  color: var(--brand);
-  font-weight: 600;
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-}
-
 /* Agent 目标输入比单句提问长，给它更大的输入区 */
 .composer.is-agent { grid-template-columns: 1fr auto; align-items: end; }
 .composer.is-agent textarea {
@@ -1484,3 +1515,194 @@
 .agent-focus button:hover { background: var(--surface); }
 
 @media (hover: none) { .agent-focus button { width: 32px; height: 32px; } }
+
+/* ---------- 对话首页：调查任务开关 ---------- */
+
+.agent-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 0;
+}
+
+.agent-mode-row .form-hint { flex: 1; min-width: 200px; }
+
+/* ---------- 调查任务汇总 ---------- */
+
+.investigation-card {
+  align-self: stretch;
+  padding: 14px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-base);
+}
+
+.investigation-card > header {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.investigation-card > header svg { color: var(--brand); }
+
+.investigation-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.investigation-facts > div {
+  padding: 8px 10px;
+  background: var(--surface);
+  border-radius: var(--radius-inner);
+}
+
+.investigation-facts dt { color: var(--muted); font-size: 11.5px; }
+.investigation-facts dd {
+  margin: 3px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.investigation-line { margin: 12px 0 0; font-size: 13px; line-height: 1.7; }
+.investigation-line .btn-link + .btn-link { margin-left: 8px; }
+
+.investigation-signals { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.investigation-signals li { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.investigation-signals code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* ---------- 审批卡 ---------- */
+
+.proposal-stream { display: grid; gap: 12px; align-self: stretch; }
+
+.proposal-card {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-base);
+}
+
+.proposal-card + .proposal-card { margin-top: 0; }
+.proposal-card.is-deny { border-color: var(--risk-line); }
+
+.proposal-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.proposal-card-head b { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+.proposal-card-head small { display: block; margin-top: 3px; }
+
+/* 域名那一行是这张卡的重点：看不清它就不该点批准 */
+.proposal-target {
+  display: flex;
+  gap: 9px;
+  padding: 11px 12px;
+  background: var(--risk-soft);
+  border: 1px solid var(--risk-line);
+  border-radius: var(--radius-inner);
+}
+
+.proposal-target > svg { flex: 0 0 auto; margin-top: 3px; color: var(--risk); }
+.proposal-target > div { min-width: 0; }
+
+.proposal-target code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: .01em;
+}
+
+.proposal-target .proposal-target-url {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.proposal-target small { display: block; margin-top: 6px; }
+
+.proposal-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 14px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.proposal-fields dt { color: var(--muted); }
+.proposal-fields dd { margin: 0; overflow-wrap: anywhere; }
+
+.proposal-probe {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-inner);
+  font-size: 13px;
+}
+
+.proposal-probe p { margin: 0 0 4px; }
+.proposal-probe-detail { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+.proposal-actions { margin-top: 12px; }
+
+/* 每周复盘卡：重点不是域名而是「依据」，所以醒目块给了依据 */
+.proposal-card.is-weekly { border-color: var(--brand-line); }
+.proposal-card.is-weekly .proposal-card-head b { flex-wrap: wrap; }
+.proposal-card.is-weekly .proposal-card-head b > svg { color: var(--brand); }
+
+.proposal-weekly-meta {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.proposal-weekly-meta > svg { flex: 0 0 auto; }
+.proposal-weekly-meta span { overflow-wrap: anywhere; }
+
+.proposal-evidence {
+  display: flex;
+  gap: 9px;
+  padding: 11px 12px;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--radius-inner);
+}
+
+.proposal-evidence > svg { flex: 0 0 auto; margin-top: 3px; color: var(--brand); }
+.proposal-evidence > div { min-width: 0; }
+.proposal-evidence b { display: block; font-size: 13px; }
+.proposal-evidence p { margin: 4px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+.proposal-evidence small { display: block; margin-top: 8px; }
+
+.proposal-digest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 9px 0 0;
+  font-size: 12px;
+}
+
+.proposal-digest > div { display: flex; gap: 5px; align-items: baseline; }
+.proposal-digest dt { color: var(--muted); }
+.proposal-digest dd { margin: 0; font-weight: 620; font-variant-numeric: tabular-nums; }
+
+.proposal-followup { margin-top: 10px; }
+.proposal-followup small { display: block; margin-bottom: 6px; }
