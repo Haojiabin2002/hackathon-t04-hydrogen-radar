@@ -49,3 +49,13 @@ radar/.pipeline.lock
 # 自定义工具与配置的原子写中间文件（os.replace 失败时才会残留）
 *.py.tmp
 *.yaml.tmp
+
+# 公开版本不接收本地私有资料和凭据
+资料/
+产品实现边界提案-0818.md
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
